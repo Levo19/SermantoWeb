@@ -104,11 +104,29 @@
                 </div>
             </section>
 
-            <!-- Dashboard View -->
-            <section id="dashboard-view" class="hidden fade-in">
+            <!-- Home View (General Dashboard) -->
+            <section id="home-view" class="hidden fade-in">
                 <header class="top-bar">
-                    <h2 id="page-title">Finanzas</h2>
+                    <h2 id="page-title">Dashboard General</h2>
                     <div class="date-display" id="current-date">--/--/----</div>
+                </header>
+                <div class="content-wrapper">
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <h3>Bienvenido</h3>
+                            <p class="text-muted">Selecciona un módulo del menú lateral para comenzar a trabajar.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Finances View (Was Dashboard) -->
+            <section id="finances-view" class="hidden fade-in">
+                <header class="top-bar">
+                    <h2 id="page-title">Gestión de Facturas</h2>
+                    <button class="btn btn-primary btn-sm" onclick="document.getElementById('file-input').click()">
+                        <i class="ph ph-upload-simple"></i> Subir Rápida
+                    </button>
                 </header>
 
                 <div class="content-wrapper">
