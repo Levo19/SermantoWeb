@@ -185,42 +185,48 @@ async function handleLogin(e) {
     }
 }
 
+// --- Layout Control ---
+function toggleLayout(isLoggedIn) {
+    const sidebar = document.getElementById('app-sidebar');
+    const authView = document.getElementById('auth-view');
+
+    if (isLoggedIn) {
+        sidebar.classList.remove('hidden');
+        if (authView) authView.classList.add('hidden');
+    } else {
+        sidebar.classList.add('hidden');
+        if (authView) authView.classList.remove('hidden');
+    }
+}
+
 function loginUser(user) {
     state.user = user;
     localStorage.setItem('sermanto_user', JSON.stringify(user));
-    renderUserNav(); // Show/Hide links
-    switchView('dashboard');
+
+    // Update Profile UI
+    if (document.getElementById('display-name')) {
+        document.getElementById('display-name').textContent = user.name || user.username;
+        document.getElementById('display-role').textContent = user.role;
+    }
+
+    toggleLayout(true); // Show Sidebar
+    updateSidebarPermissions(); // Show Admin Menu if needed
+
+    switchView('home-view');
+}
+
+function updateSidebarPermissions() {
+    const adminMenu = document.getElementById('admin-menu-section');
+    if (state.user && ['admin', 'superadmin'].includes(state.user.role)) {
+        adminMenu.classList.remove('hidden');
+    } else {
+        adminMenu.classList.add('hidden');
+    }
 }
 
 function renderUserNav() {
-    const header = document.querySelector('.app-header');
-    let nav = header.querySelector('.nav-links');
-
-    if (!nav) {
-        nav = document.createElement('nav');
-        nav.className = 'nav-links';
-        // Insert after brand
-        const brand = header.querySelector('.brand-logo');
-        brand.after(nav);
-    }
-
-    nav.innerHTML = `
-        <a class="nav-link" onclick="switchView('finances-view')">Finanzas</a>
-    `;
-
-    // Admin/Superadmin Check
-    if (state.user && ['admin', 'superadmin'].includes(state.user.role)) {
-        nav.innerHTML += `
-            <a class="nav-link" onclick="loadUsers()">Usuarios</a>
-        `;
-    }
-
-    // Logout Button (Profile)
-    const profile = document.getElementById('user-profile');
-    if (state.user) {
-        profile.classList.remove('hidden');
-        profile.innerHTML = `<button class="btn-icon" onclick="logout()"><i class="ph ph-sign-out"></i></button>`;
-    }
+    // Legacy function replaced by updateSidebarPermissions + toggleLayout
+    // Keeping empty alias if needed
 }
 
 function logout() {
