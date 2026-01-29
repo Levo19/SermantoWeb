@@ -206,6 +206,39 @@
         </main>
     </div>
 
+    <!-- User Modal -->
+    <div id="user-modal" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">Nuevo Usuario</h3>
+                <button class="close-btn" onclick="closeUserModal()">&times;</button>
+            </div>
+            <form id="user-form">
+                <div class="form-group">
+                    <label class="form-label">Usuario (ID)</label>
+                    <input type="text" name="Usuario" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nombres Completos</label>
+                    <input type="text" name="Nombres" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Contraseña</label>
+                    <input type="text" name="Contrase&#241;a" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Rol</label>
+                    <select name="Rol" class="form-input">
+                        <option value="operador">Operador</option>
+                        <option value="contador">Contador</option>
+                        <option value="admin">Administrador</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Guardar Usuario</button>
+            </form>
+        </div>
+    </div>
+
     <!-- Income Modal -->
     <div id="income-modal" class="modal-overlay hidden">
         <div class="modal-dialog">
