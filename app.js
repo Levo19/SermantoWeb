@@ -355,10 +355,129 @@ function switchView(viewName) {
     const menuItems = document.querySelectorAll('.menu-item');
     menuItems.forEach(item => {
         item.classList.remove('active');
-        // Simple heuristic: checks if click handler matches view name
-        // Ideally we use data-view attribute, but this works for now
         if (item.getAttribute('onclick') && item.getAttribute('onclick').includes(viewName)) {
             item.classList.add('active');
         }
     });
+
+    // Auto-load finance data if entering finance view
+    if (viewName === 'finances-view') {
+        const date = new Date().toLocaleDateString();
+        document.getElementById('finance-date').textContent = date;
+        // loadExpenses(); // Future: Load real data
+    }
 }
+
+// --- Finance Module Logic ---
+
+function switchFinanceTab(tabName) {
+    // 1. Update Buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    // Simple check based on text or click handler would be better, but we rely on order or ID for now
+    // Actually, finding the button that called this would be cleaner, but let's toggle visibility first
+
+    // 2. Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+
+    // 3. Show target
+    document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+
+    // 4. Update button active state (simple hack: finding the button via event is harder here without 'event' passed)
+    // Let's assume the user clicks.
+    const btns = document.querySelectorAll('.tab-btn');
+    if (tabName === 'expenses') btns[0].classList.add('active');
+    if (tabName === 'income') btns[1].classList.add('active');
+}
+
+// Generic Modal Helpers
+function openModal(modalId) {
+    document.getElementById(modalId).classList.remove('hidden');
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.add('hidden');
+}
+
+function openExpenseModal() { openModal('expense-modal'); }
+function openIncomeModal() { openModal('income-modal'); }
+
+// Expense Form Submit
+document.getElementById('expense-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'Guardando...';
+    btn.disabled = true;
+
+    const formData = new FormData(e.target);
+    const payload = Object.fromEntries(formData.entries());
+
+    // Basic upload handling if file present (for later)
+    // For now we just save data
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'create',
+                table: 'Gastos',
+                userRole: state.user.role,
+                payload: payload
+            })
+        });
+        const res = await response.json();
+        if (res.status === 'success') {
+            alert('Gasto registrado correctamente');
+            closeModal('expense-modal');
+            e.target.reset();
+        } else {
+            alert('Error: ' + res.message);
+        }
+    } catch (error) {
+        console.error(error);
+        alert('Error de conexión');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+});
+
+// Income Form Submit
+document.getElementById('income-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = 'Guardando...';
+    btn.disabled = true;
+
+    const formData = new FormData(e.target);
+    const payload = Object.fromEntries(formData.entries());
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'create',
+                table: 'Ingresos',
+                userRole: state.user.role,
+                payload: payload
+            })
+        });
+        const res = await response.json();
+        if (res.status === 'success') {
+            alert('Ingreso registrado correctamente');
+            closeModal('income-modal');
+            e.target.reset();
+        } else {
+            alert('Error: ' + res.message);
+        }
+    } catch (error) {
+        console.error(error);
+        alert('Error de conexión');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+});
