@@ -201,7 +201,7 @@ function renderUserNav() {
     }
 
     nav.innerHTML = `
-        <a class="nav-link" onclick="switchView('dashboard')">Inicio</a>
+        <a class="nav-link" onclick="switchView('dashboard')">Finanzas</a>
     `;
 
     // Admin/Superadmin Check
@@ -328,14 +328,16 @@ document.getElementById('user-form').addEventListener('submit', async (e) => {
 });
 
 function switchView(viewName) {
-    // Hide all
-    Object.values(views).forEach(el => el.classList.add('hidden'));
+    // Hide all direct children sections of main
+    const sections = document.querySelectorAll('main > section');
+    sections.forEach(el => el.classList.add('hidden'));
 
     // Show target
-    // Add users view to map dynamically if needed or just query selector
     const target = document.getElementById(viewName);
     if (target) {
         target.classList.remove('hidden');
         state.currentView = viewName;
+    } else {
+        console.error("View not found:", viewName);
     }
 }
