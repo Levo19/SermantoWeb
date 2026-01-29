@@ -110,7 +110,69 @@
 
             </section>
 
+            <!-- Users View (Admin Only) -->
+            <section id="users-view" class="hidden fade-in">
+                <div class="dashboard-header" style="justify-content:space-between; display:flex; align-items:center;">
+                    <div>
+                        <h2>Usuarios</h2>
+                        <p class="text-muted">Gestión de personal y accesos</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openUserModal()">
+                        <i class="ph ph-plus"></i> Nuevo Usuario
+                    </button>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Usuario</th>
+                                <th>Nombres</th>
+                                <th>Rol</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
         </main>
+    </div>
+
+    <!-- User Modal -->
+    <div id="user-modal" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">Nuevo Usuario</h3>
+                <button class="close-btn" onclick="closeUserModal()">&times;</button>
+            </div>
+            <form id="user-form">
+                <div class="form-group">
+                    <label class="form-label">Usuario (ID)</label>
+                    <input type="text" name="Usuario" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nombres Completos</label>
+                    <input type="text" name="Nombres" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Contraseña</label>
+                    <input type="text" name="Contrase&#241;a" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Rol</label>
+                    <select name="Rol" class="form-input">
+                        <option value="operador">Operador</option>
+                        <option value="contador">Contador</option>
+                        <option value="admin">Administrador</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Guardar Usuario</button>
+            </form>
+        </div>
     </div>
 
     <!-- Logic -->
