@@ -112,7 +112,7 @@ const toBase64 = file => new Promise((resolve, reject) => {
 });
 
 // API Connection
-const API_URL = 'https://script.google.com/macros/s/AKfycby_vohLJZz_9-M6DukKcQ2HnqZoCMee2Xoj2wrlXWNbZwilsvebylhnVHLKMSpVpsH7qg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzfV8aFdVZ07tMweU5qUDfRxJbkfYw-7m6llDAP2tiumTOT4DlOp9xlwedKmmmmhWOSaA/exec';
 
 async function uploadToGAS(fileName, mimeType, base64) {
     const payload = {
@@ -339,4 +339,3 @@ function switchView(viewName) {
         state.currentView = viewName;
     }
 }
-
