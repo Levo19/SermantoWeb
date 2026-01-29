@@ -44,8 +44,8 @@
 
                 <div class="menu-category">Finanzas</div>
                 <a class="menu-item" onclick="switchView('finances-view')">
-                    <i class="ph ph-receipt"></i>
-                    <span>Facturas</span>
+                    <i class="ph ph-wallet"></i>
+                    <span>Tesorería</span>
                 </a>
 
                 <div id="admin-menu-section" class="hidden">
@@ -319,7 +319,8 @@
                 <!-- File Upload Preview -->
                 <div class="form-group upload-mini-preview" id="expense-file-preview">
                     <label class="form-label">Comprobante (Foto/PDF)</label>
-                    <input type="file" id="expense-file-input" accept="image/*,application/pdf" class="form-input">
+                    <input type="file" id="expense-file-input" accept="image/*,application/pdf" capture="environment"
+                        class="form-input">
                 </div>
 
                 <div class="form-group">
