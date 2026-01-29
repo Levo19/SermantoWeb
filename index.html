@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sermanto ERP</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+    <!-- Icons (Phosphor Icons - Lightweight) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="brand-logo">
+                <div class="brand-icon">
+                    <i class="ph ph-anchor-simple"></i>
+                </div>
+                <span>Sermanto</span>
+            </div>
+            <div id="user-profile" class="hidden">
+                <!-- User menu will go here -->
+                <button class="btn-icon"><i class="ph ph-user"></i></button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main id="main-content">
+
+            <!-- Auth View -->
+            <section id="auth-view" class="auth-container fade-in">
+                <div class="auth-card">
+                    <h1 class="auth-title">Bienvenido</h1>
+                    <p class="auth-subtitle">Sistema de Servicios Navieros</p>
+
+                    <form id="login-form">
+                        <div class="form-group">
+                            <label class="form-label">Usuario</label>
+                            <input type="text" class="form-input" placeholder="Ej. operador1">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Contraseña</label>
+                            <input type="password" class="form-input" placeholder="••••••••">
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            INGRESAR <i class="ph ph-arrow-right"></i>
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Dashboard View -->
+            <section id="dashboard-view" class="hidden fade-in">
+
+                <div class="dashboard-header">
+                    <h2>Gestión de Facturas</h2>
+                    <p class="text-muted">Sube o escanea tus gastos del mes</p>
+                </div>
+
+                <!-- Action Cards -->
+                <div class="dashboard-grid">
+
+                    <!-- Upload Card -->
+                    <div class="card upload-card">
+                        <div class="upload-area" id="drop-zone">
+                            <div class="icon-circle">
+                                <i class="ph ph-camera"></i>
+                            </div>
+                            <h3>Nueva Factura</h3>
+                            <p>Arrastra un archivo o usa la cámara</p>
+
+                            <div class="upload-actions">
+                                <input type="file" id="file-input" accept="image/*,application/pdf" class="hidden">
+                                <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
+                                    <i class="ph ph-camera"></i> Tomar Foto / Subir
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stats Card (Future) -->
+                    <div class="card stats-card">
+                        <h3>Resumen del Mes</h3>
+                        <div class="stat-row">
+                            <span>Facturas subidas</span>
+                            <strong>0</strong>
+                        </div>
+                        <div class="stat-row">
+                            <span>Estado</span>
+                            <span class="badge warning">Pendiente Declaración</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent List -->
+                <div class="recent-section">
+                    <h3>Recientes</h3>
+                    <div id="invoice-list" class="invoice-list">
+                        <!-- Items will be injected here -->
+                        <div class="empty-state">No hay facturas recientes.</div>
+                    </div>
+                </div>
+
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Logic -->
+    <script src="app.js"></script>
+</body>
+
+</html>
