@@ -364,7 +364,8 @@ function switchView(viewName) {
     if (viewName === 'finances-view') {
         const date = new Date().toLocaleDateString();
         document.getElementById('finance-date').textContent = date;
-        // loadExpenses(); // Future: Load real data
+        loadExpenses();
+        loadIncome();
     }
 }
 
@@ -478,6 +479,7 @@ document.getElementById('income-form').addEventListener('submit', async (e) => {
             alert('Ingreso registrado correctamente');
             closeModal('income-modal');
             e.target.reset();
+            loadIncome(); // Refresh Data
         } else {
             alert('Error: ' + res.message);
         }
@@ -489,3 +491,93 @@ document.getElementById('income-form').addEventListener('submit', async (e) => {
         btn.disabled = false;
     }
 });
+
+// --- Data Loading Functions ---
+
+async function loadExpenses() {
+    const tbody = document.getElementById('expenses-list');
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center">Cargando datos...</td></tr>';
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'read',
+                table: 'Gastos',
+                userRole: state.user.role
+            })
+        });
+        const res = await response.json();
+        if (res.status === 'success' && res.data && res.data.length > 0) {
+            tbody.innerHTML = res.data.map(item => `
+                <tr>
+                    <td>${formatDate(item.Fecha)}</td>
+                    <td>${item.Proveedor || '-'}</td>
+                    <td><span class="badge">${item.Categoria || 'General'}</span></td>
+                    <td>S/ ${parseFloat(item.Monto).toFixed(2)}</td>
+                    <td>
+                         ${item.fileUrl ? `<a href="${item.fileUrl}" target="_blank" class="action-btn"><i class="ph ph-file-pdf"></i> Ver</a>` : '<span class="text-muted">-</span>'}
+                    </td>
+                </tr>
+            `).join('');
+
+            // Calculate Monthly Total
+            const total = res.data.reduce((acc, curr) => acc + (parseFloat(curr.Monto) || 0), 0);
+            const totalEl = document.querySelector('#tab-expenses .mini-stats .value');
+            if (totalEl) totalEl.textContent = `S/ ${total.toFixed(2)}`;
+
+            // Pending Count (Mock)
+            const countEl = document.querySelector('#tab-expenses .mini-stats .value.warning');
+            if (countEl) countEl.textContent = res.data.length;
+
+        } else {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">No hay gastos registrados.</td></tr>';
+        }
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center warning">Error al cargar.</td></tr>';
+    }
+}
+
+async function loadIncome() {
+    const tbody = document.getElementById('income-list');
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center">Cargando datos...</td></tr>';
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'read',
+                table: 'Ingresos',
+                userRole: state.user.role
+            })
+        });
+        const res = await response.json();
+        if (res.status === 'success' && res.data && res.data.length > 0) {
+            tbody.innerHTML = res.data.map(item => `
+                <tr>
+                    <td>${formatDate(item.Fecha)}</td>
+                    <td>${item.Cliente || '-'}</td>
+                    <td>${item.Contrato || '-'}</td>
+                    <td>S/ ${parseFloat(item.Monto).toFixed(2)}</td>
+                    <td><span class="badge success">Registrado</span></td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">No hay ingresos registrados.</td></tr>';
+        }
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center warning">Error al cargar.</td></tr>';
+    }
+}
+
+function formatDate(dateString) {
+    if (!dateString) return '-';
+    // Handle both "2024-01-29" and full ISO strings
+    const date = new Date(dateString);
+    if (isNaN(date)) return dateString;
+    return date.toLocaleDateString();
+}
