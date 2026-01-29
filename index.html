@@ -16,27 +16,75 @@
 </head>
 
 <body>
-    <div class="app-container">
-        <!-- Header -->
-        <header class="app-header">
+    <div class="app-layout">
+
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar hidden" id="app-sidebar">
             <div class="brand-logo">
-                <div class="brand-icon">
-                    <i class="ph ph-anchor-simple"></i>
-                </div>
+                <i class="ph ph-anchor-simple brand-icon"></i>
                 <span>Sermanto</span>
             </div>
-            <div id="user-profile" class="hidden">
-                <!-- User menu will go here -->
-                <button class="btn-icon"><i class="ph ph-user"></i></button>
+
+            <nav class="sidebar-menu">
+                <div class="menu-category">General</div>
+                <a class="menu-item active" onclick="switchView('dashboard')">
+                    <i class="ph ph-squares-four"></i>
+                    <span>Dashboard</span>
+                </a>
+
+                <div class="menu-category">Operaciones</div>
+                <a class="menu-item disabled">
+                    <i class="ph ph-boat"></i>
+                    <span>Servicios</span>
+                </a>
+                <a class="menu-item disabled">
+                    <i class="ph ph-package"></i>
+                    <span>Inventario</span>
+                </a>
+
+                <div class="menu-category">Finanzas</div>
+                <a class="menu-item" onclick="switchView('dashboard')">
+                    <i class="ph ph-receipt"></i>
+                    <span>Facturas</span>
+                </a>
+
+                <div id="admin-menu-section" class="hidden">
+                    <div class="menu-category">Administración</div>
+                    <a class="menu-item" onclick="loadUsers()">
+                        <i class="ph ph-users"></i>
+                        <span>Usuarios</span>
+                    </a>
+                    <a class="menu-item disabled">
+                        <i class="ph ph-gear"></i>
+                        <span>Configuración</span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="user-profile-section" id="user-profile-sidebar">
+                <div class="user-info">
+                    <i class="ph ph-user-circle user-avatar"></i>
+                    <div class="user-details">
+                        <span class="user-name" id="display-name">Usuario</span>
+                        <span class="user-role" id="display-role">Rol</span>
+                    </div>
+                </div>
+                <button class="logout-btn" onclick="logout()">
+                    <i class="ph ph-sign-out"></i>
+                </button>
             </div>
-        </header>
+        </aside>
 
         <!-- Main Content -->
-        <main id="main-content">
+        <main id="main-content" class="main-content">
 
             <!-- Auth View -->
             <section id="auth-view" class="auth-container fade-in">
                 <div class="auth-card">
+                    <div class="brand-logo center-brand">
+                        <i class="ph ph-anchor-simple brand-icon"></i>
+                        <span>Sermanto</span>
+                    </div>
                     <h1 class="auth-title">Bienvenido</h1>
                     <p class="auth-subtitle">Sistema de Servicios Navieros</p>
 
@@ -58,84 +106,82 @@
 
             <!-- Dashboard View -->
             <section id="dashboard-view" class="hidden fade-in">
+                <header class="top-bar">
+                    <h2 id="page-title">Finanzas</h2>
+                    <div class="date-display" id="current-date">--/--/----</div>
+                </header>
 
-                <div class="dashboard-header">
-                    <h2>Gestión de Facturas</h2>
-                    <p class="text-muted">Sube o escanea tus gastos del mes</p>
-                </div>
+                <div class="content-wrapper">
+                    <!-- Action Cards -->
+                    <div class="dashboard-grid">
+                        <!-- Upload Card -->
+                        <div class="card upload-card">
+                            <div class="upload-area" id="drop-zone">
+                                <div class="icon-circle">
+                                    <i class="ph ph-camera"></i>
+                                </div>
+                                <h3>Nueva Factura</h3>
+                                <p>Arrastra un archivo o usa la cámara</p>
 
-                <!-- Action Cards -->
-                <div class="dashboard-grid">
-
-                    <!-- Upload Card -->
-                    <div class="card upload-card">
-                        <div class="upload-area" id="drop-zone">
-                            <div class="icon-circle">
-                                <i class="ph ph-camera"></i>
+                                <div class="upload-actions">
+                                    <input type="file" id="file-input" accept="image/*,application/pdf" class="hidden">
+                                    <button class="btn btn-primary"
+                                        onclick="document.getElementById('file-input').click()">
+                                        <i class="ph ph-camera"></i> Tomar Foto / Subir
+                                    </button>
+                                </div>
                             </div>
-                            <h3>Nueva Factura</h3>
-                            <p>Arrastra un archivo o usa la cámara</p>
+                        </div>
 
-                            <div class="upload-actions">
-                                <input type="file" id="file-input" accept="image/*,application/pdf" class="hidden">
-                                <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">
-                                    <i class="ph ph-camera"></i> Tomar Foto / Subir
-                                </button>
+                        <!-- Stats Card -->
+                        <div class="card stats-card">
+                            <h3>Resumen del Mes</h3>
+                            <div class="stat-row">
+                                <span>Facturas subidas</span>
+                                <strong>0</strong>
+                            </div>
+                            <div class="stat-row">
+                                <span>Estado</span>
+                                <span class="badge warning">Pendiente Declaración</span>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Stats Card (Future) -->
-                    <div class="card stats-card">
-                        <h3>Resumen del Mes</h3>
-                        <div class="stat-row">
-                            <span>Facturas subidas</span>
-                            <strong>0</strong>
-                        </div>
-                        <div class="stat-row">
-                            <span>Estado</span>
-                            <span class="badge warning">Pendiente Declaración</span>
+                    <!-- Recent List -->
+                    <div class="recent-section">
+                        <h3>Recientes</h3>
+                        <div id="invoice-list" class="invoice-list">
+                            <div class="empty-state">No hay facturas recientes.</div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Recent List -->
-                <div class="recent-section">
-                    <h3>Recientes</h3>
-                    <div id="invoice-list" class="invoice-list">
-                        <!-- Items will be injected here -->
-                        <div class="empty-state">No hay facturas recientes.</div>
-                    </div>
-                </div>
-
             </section>
 
             <!-- Users View (Admin Only) -->
             <section id="users-view" class="hidden fade-in">
-                <div class="dashboard-header" style="justify-content:space-between; display:flex; align-items:center;">
-                    <div>
-                        <h2>Usuarios</h2>
-                        <p class="text-muted">Gestión de personal y accesos</p>
-                    </div>
-                    <button class="btn btn-primary" onclick="openUserModal()">
+                <header class="top-bar">
+                    <h2>Gestión de Usuarios</h2>
+                    <button class="btn btn-primary btn-sm" onclick="openUserModal()">
                         <i class="ph ph-plus"></i> Nuevo Usuario
                     </button>
-                </div>
+                </header>
 
-                <div class="table-container">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Usuario</th>
-                                <th>Nombres</th>
-                                <th>Rol</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="users-table-body">
-                            <!-- Populated by JS -->
-                        </tbody>
-                    </table>
+                <div class="content-wrapper">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Usuario</th>
+                                    <th>Nombres</th>
+                                    <th>Rol</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 
