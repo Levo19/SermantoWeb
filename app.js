@@ -33,6 +33,8 @@ function initUploadListeners() {
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('file-input');
 
+    if (!dropZone || !fileInput) return; // Exit if elements don't exist (Refactored View)
+
     // Drag & Drop
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
