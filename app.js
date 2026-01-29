@@ -398,8 +398,16 @@ function closeModal(modalId) {
     document.getElementById(modalId).classList.add('hidden');
 }
 
-function openExpenseModal() { openModal('expense-modal'); }
-function openIncomeModal() { openModal('income-modal'); }
+function openExpenseModal() {
+    openModal('expense-modal');
+    // Set Default Date to Today
+    document.querySelector('#expense-form input[name="Fecha"]').valueAsDate = new Date();
+}
+
+function openIncomeModal() {
+    openModal('income-modal');
+    document.querySelector('#income-form input[name="Fecha"]').valueAsDate = new Date();
+}
 
 // Expense Form Submit
 document.getElementById('expense-form').addEventListener('submit', async (e) => {
