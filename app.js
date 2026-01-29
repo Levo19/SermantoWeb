@@ -134,7 +134,11 @@ function checkSession() {
     const savedUser = localStorage.getItem('sermanto_user');
     if (savedUser) {
         state.user = JSON.parse(savedUser);
+        toggleLayout(true); // Ensure sidebar is visible
+        updateSidebarPermissions();
         switchView('dashboard');
+    } else {
+        toggleLayout(false); // Ensure login is visible
     }
 }
 
