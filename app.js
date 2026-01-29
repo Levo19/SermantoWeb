@@ -212,6 +212,10 @@ function loginUser(user) {
     toggleLayout(true); // Show Sidebar
     updateSidebarPermissions(); // Show Admin Menu if needed
 
+    // Preload Data
+    loadExpenses();
+    loadIncome();
+
     switchView('home-view');
 }
 
@@ -414,18 +418,75 @@ function openIncomeModal() {
 document.getElementById('expense-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = 'Guardando...';
     btn.disabled = true;
 
+    // 1. Capture Data
     const formData = new FormData(e.target);
-    const payload = Object.fromEntries(formData.entries());
+    const fileInput = document.getElementById('expense-file-input');
+    const file = fileInput.files[0];
 
-    // Basic upload handling if file present (for later)
-    // For now we just save data
+    // 2. Optimistic UI (Render immediately)
+    const tempId = 'temp-' + Date.now();
+    const tempItem = {
+        Fecha: formData.get('Fecha') || new Date().toISOString(),
+        Proveedor: formData.get('Proveedor'),
+        Categoria: formData.get('Categoria'),
+        Monto: formData.get('Monto'),
+        fileUrl: null // Will update later if file exists
+    };
 
+    const tbody = document.getElementById('expenses-list');
+    // Remove "No expenses" or "Loading" row if exists
+    if (tbody.querySelector('.text-center')) tbody.innerHTML = '';
+
+    const rowHtml = `
+        <tr id="${tempId}" class="fade-in" style="background: #f0fdf4;">
+            <td>${formatDate(tempItem.Fecha)}</td>
+            <td>${tempItem.Proveedor}</td>
+            <td><span class="badge">${tempItem.Categoria}</span></td>
+            <td>S/ ${parseFloat(tempItem.Monto).toFixed(2)}</td>
+            <td id="e-${tempId}">
+                ${file ? '<span class="text-muted"><i class="ph ph-spinner ph-spin"></i> Subiendo...</span>' : '-'}
+            </td>
+        </tr>
+    `;
+    tbody.insertAdjacentHTML('afterbegin', rowHtml);
+    closeModal('expense-modal');
+    e.target.reset();
+
+    // 3. Background Process (Upload + Save)
     try {
-        const response = await fetch(API_URL, {
+        let fileUrl = '';
+
+        // A. Upload File if exists
+        if (file) {
+            const base64 = await toBase64(file);
+            const uploadPayload = {
+                action: 'uploadInvoice',
+                fileName: file.name,
+                mimeType: file.type,
+                fileBase64: base64
+            };
+
+            const uploadResp = await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify(uploadPayload)
+            });
+            const uploadResult = await uploadResp.json();
+
+            if (uploadResult.status === 'success') {
+                fileUrl = uploadResult.fileUrl;
+                // Update Optimistic UI Confirmation
+                const evidenceCell = document.getElementById(`e-${tempId}`);
+                if (evidenceCell) evidenceCell.innerHTML = `<a href="${fileUrl}" target="_blank" class="action-btn"><i class="ph ph-file-pdf"></i> Ver</a>`;
+            }
+        }
+
+        // B. Save Record to DB
+        const payload = Object.fromEntries(formData.entries());
+        payload.fileUrl = fileUrl; // Add the URL to the payload
+
+        await fetch(API_URL, {
             method: 'POST',
             body: JSON.stringify({
                 action: 'db',
@@ -435,20 +496,22 @@ document.getElementById('expense-form').addEventListener('submit', async (e) => 
                 payload: payload
             })
         });
-        const res = await response.json();
-        if (res.status === 'success') {
-            alert('Gasto registrado correctamente');
-            closeModal('expense-modal');
-            e.target.reset();
-        } else {
-            alert('Error: ' + res.message);
-        }
+
+        console.log('Gasto sincronizado en background');
+        // Remove temp highlight
+        setTimeout(() => {
+            const row = document.getElementById(tempId);
+            if (row) row.style.background = 'white';
+        }, 2000);
+
     } catch (error) {
         console.error(error);
-        alert('Error de conexión');
+        alert('Hubo un error guardando el gasto en la nube. Por favor verifica tu conexión.');
+        const row = document.getElementById(tempId);
+        if (row) row.style.backgroundColor = '#fff0f0';
     } finally {
-        btn.innerHTML = originalText;
         btn.disabled = false;
+        // loadExpenses(); // Optional: Refresh full list to get server-side sort/ID
     }
 });
 
