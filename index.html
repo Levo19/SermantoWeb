@@ -121,57 +121,97 @@
             </section>
 
             <!-- Finances View (Was Dashboard) -->
+            <!-- Finances View (Advanced) -->
             <section id="finances-view" class="hidden fade-in">
                 <header class="top-bar">
-                    <h2 id="page-title">Gestión de Facturas</h2>
-                    <button class="btn btn-primary btn-sm" onclick="document.getElementById('file-input').click()">
-                        <i class="ph ph-upload-simple"></i> Subir Rápida
-                    </button>
+                    <h2 id="page-title">Gestión Financiera</h2>
+                    <div class="date-display" id="finance-date">--/--/----</div>
                 </header>
 
                 <div class="content-wrapper">
-                    <!-- Action Cards -->
-                    <div class="dashboard-grid">
-                        <!-- Upload Card -->
-                        <div class="card upload-card">
-                            <div class="upload-area" id="drop-zone">
-                                <div class="icon-circle">
-                                    <i class="ph ph-camera"></i>
-                                </div>
-                                <h3>Nueva Factura</h3>
-                                <p>Arrastra un archivo o usa la cámara</p>
 
-                                <div class="upload-actions">
-                                    <input type="file" id="file-input" accept="image/*,application/pdf" class="hidden">
-                                    <button class="btn btn-primary"
-                                        onclick="document.getElementById('file-input').click()">
-                                        <i class="ph ph-camera"></i> Tomar Foto / Subir
-                                    </button>
-                                </div>
+                    <!-- Finance Tabs -->
+                    <div class="tabs-nav">
+                        <button class="tab-btn active" onclick="switchFinanceTab('expenses')">
+                            <i class="ph ph-receipt"></i> Gastos
+                        </button>
+                        <button class="tab-btn" onclick="switchFinanceTab('income')">
+                            <i class="ph ph-trend-up"></i> Ingresos
+                        </button>
+                    </div>
+
+                    <!-- Tab: GASTOS -->
+                    <div id="tab-expenses" class="tab-content active">
+                        <div class="dashboard-header-actions">
+                            <p class="text-muted">Registra facturas y recibos para contabilidad.</p>
+                            <button class="btn btn-primary" onclick="openExpenseModal()">
+                                <i class="ph ph-plus"></i> Nuevo Gasto
+                            </button>
+                        </div>
+
+                        <!-- Mini Stats for Expenses -->
+                        <div class="dashboard-grid mini-stats">
+                            <div class="card stat-card-sm">
+                                <span class="label">Gastos del Mes</span>
+                                <strong class="value">S/ 0.00</strong>
+                            </div>
+                            <div class="card stat-card-sm">
+                                <span class="label">Pendientes</span>
+                                <strong class="value warning">0</strong>
                             </div>
                         </div>
 
-                        <!-- Stats Card -->
-                        <div class="card stats-card">
-                            <h3>Resumen del Mes</h3>
-                            <div class="stat-row">
-                                <span>Facturas subidas</span>
-                                <strong>0</strong>
-                            </div>
-                            <div class="stat-row">
-                                <span>Estado</span>
-                                <span class="badge warning">Pendiente Declaración</span>
-                            </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Proveedor</th>
+                                        <th>Categoría</th>
+                                        <th>Monto</th>
+                                        <th>Evidencia</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="expenses-list">
+                                    <!-- Populated by JS -->
+                                    <tr>
+                                        <td colspan="5" class="text-center">Cargando...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <!-- Recent List -->
-                    <div class="recent-section">
-                        <h3>Recientes</h3>
-                        <div id="invoice-list" class="invoice-list">
-                            <div class="empty-state">No hay facturas recientes.</div>
+                    <!-- Tab: INGRESOS -->
+                    <div id="tab-income" class="tab-content hidden">
+                        <div class="dashboard-header-actions">
+                            <p class="text-muted">Registro de pagos de contratos y naves.</p>
+                            <button class="btn btn-success" onclick="openIncomeModal()">
+                                <i class="ph ph-money"></i> Registrar Ingreso
+                            </button>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Cliente / Nave</th>
+                                        <th>Contrato/OS</th>
+                                        <th>Monto</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="income-list">
+                                    <!-- Populated by JS -->
+                                    <tr>
+                                        <td colspan="5" class="text-center">No hay ingresos registrados este mes.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
+
                 </div>
             </section>
 
