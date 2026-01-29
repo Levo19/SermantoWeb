@@ -138,21 +138,46 @@ function checkSession() {
     }
 }
 
-function handleLogin(e) {
+async function handleLogin(e) {
     e.preventDefault();
 
-    // Simulating Auth for Phase 1
-    // In real implementation, this would call GAS API
     const userUser = e.target.querySelector('input[type="text"]').value;
+    const userPass = e.target.querySelector('input[type="password"]').value;
+    const btn = e.target.querySelector('button');
 
-    if (userUser) {
-        const mockUser = {
-            id: 'u1',
-            name: userUser,
-            role: 'operator' // Default for now
+    if (!userUser || !userPass) return;
+
+    // UI Loading State
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="ph ph-spinner ph-spin"></i> Entrando...';
+    btn.disabled = true;
+
+    try {
+        const payload = {
+            action: 'login',
+            username: userUser,
+            password: userPass
         };
 
-        loginUser(mockUser);
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            loginUser(data.user);
+        } else {
+            alert("Error: " + data.message);
+        }
+
+    } catch (error) {
+        console.error(error);
+        alert("Error de conexión con el servidor");
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
     }
 }
 
