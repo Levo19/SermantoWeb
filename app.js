@@ -136,7 +136,7 @@ function checkSession() {
         state.user = JSON.parse(savedUser);
         toggleLayout(true); // Ensure sidebar is visible
         updateSidebarPermissions();
-        switchView('dashboard');
+        switchView('home-view');
     } else {
         toggleLayout(false); // Ensure login is visible
     }
@@ -205,7 +205,7 @@ function renderUserNav() {
     }
 
     nav.innerHTML = `
-        <a class="nav-link" onclick="switchView('dashboard')">Finanzas</a>
+        <a class="nav-link" onclick="switchView('finances-view')">Finanzas</a>
     `;
 
     // Admin/Superadmin Check
@@ -344,4 +344,15 @@ function switchView(viewName) {
     } else {
         console.error("View not found:", viewName);
     }
+
+    // Update Sidebar Active State
+    const menuItems = document.querySelectorAll('.menu-item');
+    menuItems.forEach(item => {
+        item.classList.remove('active');
+        // Simple heuristic: checks if click handler matches view name
+        // Ideally we use data-view attribute, but this works for now
+        if (item.getAttribute('onclick') && item.getAttribute('onclick').includes(viewName)) {
+            item.classList.add('active');
+        }
+    });
 }
