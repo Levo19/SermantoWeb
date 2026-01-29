@@ -184,16 +184,159 @@ async function handleLogin(e) {
 function loginUser(user) {
     state.user = user;
     localStorage.setItem('sermanto_user', JSON.stringify(user));
+    renderUserNav(); // Show/Hide links
     switchView('dashboard');
 }
+
+function renderUserNav() {
+    const header = document.querySelector('.app-header');
+    let nav = header.querySelector('.nav-links');
+
+    if (!nav) {
+        nav = document.createElement('nav');
+        nav.className = 'nav-links';
+        // Insert after brand
+        const brand = header.querySelector('.brand-logo');
+        brand.after(nav);
+    }
+
+    nav.innerHTML = `
+        <a class="nav-link" onclick="switchView('dashboard')">Inicio</a>
+    `;
+
+    // Admin/Superadmin Check
+    if (state.user && ['admin', 'superadmin'].includes(state.user.role)) {
+        nav.innerHTML += `
+            <a class="nav-link" onclick="loadUsers()">Usuarios</a>
+        `;
+    }
+
+    // Logout Button (Profile)
+    const profile = document.getElementById('user-profile');
+    if (state.user) {
+        profile.classList.remove('hidden');
+        profile.innerHTML = `<button class="btn-icon" onclick="logout()"><i class="ph ph-sign-out"></i></button>`;
+    }
+}
+
+function logout() {
+    state.user = null;
+    localStorage.removeItem('sermanto_user');
+    location.reload();
+}
+
+async function loadUsers() {
+    switchView('users-view');
+    const tbody = document.getElementById('users-table-body');
+    tbody.innerHTML = '<tr><td colspan="4">Cargando...</td></tr>';
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'read',
+                table: 'Usuarios',
+                userRole: state.user.role
+            })
+        });
+
+        const res = await response.json();
+        if (res.status === 'success') {
+            tbody.innerHTML = '';
+            res.data.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${u.Usuario}</td>
+                    <td>${u.Nombres || '-'}</td>
+                    <td><span class="badge ${u.Rol === 'admin' ? 'warning' : ''}">${u.Rol}</span></td>
+                    <td>
+                        <button class="action-btn" onclick='editUser(${JSON.stringify(u)})'><i class="ph ph-pencil"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            alert(res.message);
+        }
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="4">Error al cargar</td></tr>';
+    }
+}
+
+// User Form State
+let isEditing = false;
+
+function openUserModal() {
+    isEditing = false;
+    document.getElementById('user-form').reset();
+    document.getElementById('modal-title').textContent = "Nuevo Usuario";
+    document.querySelector('input[name="Usuario"]').readOnly = false;
+    document.getElementById('user-modal').classList.remove('hidden');
+}
+
+function closeUserModal() {
+    document.getElementById('user-modal').classList.add('hidden');
+}
+
+function editUser(user) {
+    isEditing = true;
+    openUserModal();
+    document.getElementById('modal-title').textContent = "Editar Usuario";
+
+    // Fill Form
+    const f = document.getElementById('user-form');
+    f.querySelector('input[name="Usuario"]').value = user.Usuario;
+    f.querySelector('input[name="Usuario"]').readOnly = true; // Cannot change ID for now
+    f.querySelector('input[name="Nombres"]').value = user.Nombres;
+    f.querySelector('input[name="Contrase&#241;a"]').value = user['Contraseña'];
+    f.querySelector('select[name="Rol"]').value = user.Rol;
+}
+
+// Form Submit
+document.getElementById('user-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(e.target);
+    const payload = Object.fromEntries(formData.entries());
+
+    const op = isEditing ? 'update' : 'create';
+
+    // Optimistic UI close
+    closeUserModal();
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: op,
+                table: 'Usuarios',
+                userRole: state.user.role, // RBAC Check
+                payload: payload
+            })
+        });
+
+        const res = await response.json();
+        alert(res.message);
+        if (res.status === 'success') loadUsers();
+
+    } catch (err) {
+        alert("Error al guardar");
+    }
+});
 
 function switchView(viewName) {
     // Hide all
     Object.values(views).forEach(el => el.classList.add('hidden'));
 
     // Show target
-    if (views[viewName]) {
-        views[viewName].classList.remove('hidden');
+    // Add users view to map dynamically if needed or just query selector
+    const target = document.getElementById(viewName);
+    if (target) {
+        target.classList.remove('hidden');
         state.currentView = viewName;
     }
 }
+
