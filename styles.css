@@ -515,3 +515,104 @@ body {
     cursor: pointer;
     color: var(--text-muted);
 }
+
+/* --- Finance Module Styles --- */
+
+/* Tabs */
+.tabs-nav {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tab-btn:hover {
+    color: var(--color-primary);
+}
+
+.tab-btn.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+}
+
+.tab-content {
+    display: block;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.tab-content.hidden {
+    display: none;
+}
+
+/* Header Actions */
+.dashboard-header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+/* Buttons Variants */
+.btn-success {
+    background: #10b981;
+    /* Emerald 500 */
+    color: white;
+}
+
+.btn-success:hover {
+    background: #059669;
+    /* Emerald 600 */
+}
+
+/* Mini Stats */
+.mini-stats {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    margin-bottom: 2rem;
+    margin-top: 0;
+}
+
+.stat-card-sm {
+    padding: 1rem 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.stat-card-sm .label {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.stat-card-sm .value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-primary);
+}
+
+.stat-card-sm .value.warning {
+    color: #d97706;
+}
+
+/* Helpers */
+.text-center {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 2rem;
+}
