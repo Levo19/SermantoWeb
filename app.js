@@ -432,6 +432,7 @@ document.getElementById('expense-form').addEventListener('submit', async (e) => 
     const tempItem = {
         Fecha: formData.get('Fecha') || new Date().toISOString(),
         Proveedor: formData.get('Proveedor'),
+        Tipo: formData.get('Tipo'),
         Categoria: formData.get('Categoria'),
         Monto: formData.get('Monto'),
         fileUrl: null // Will update later if file exists
@@ -445,11 +446,13 @@ document.getElementById('expense-form').addEventListener('submit', async (e) => 
         <tr id="${tempId}" class="fade-in" style="background: #f0fdf4;">
             <td>${formatDate(tempItem.Fecha)}</td>
             <td>${tempItem.Proveedor}</td>
+            <td>${tempItem.Tipo || 'Factura'}</td>
             <td><span class="badge">${tempItem.Categoria}</span></td>
             <td>S/ ${parseFloat(tempItem.Monto).toFixed(2)}</td>
             <td id="e-${tempId}">
                 ${file ? '<span class="text-muted"><i class="ph ph-spinner ph-spin"></i> Subiendo...</span>' : '-'}
             </td>
+            <td><span class="text-muted">...</span></td>
         </tr>
     `;
     tbody.insertAdjacentHTML('afterbegin', rowHtml);
@@ -561,7 +564,7 @@ document.getElementById('income-form').addEventListener('submit', async (e) => {
 
 async function loadExpenses() {
     const tbody = document.getElementById('expenses-list');
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center">Cargando datos...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center">Cargando datos...</td></tr>';
 
     try {
         const response = await fetch(API_URL, {
@@ -576,13 +579,17 @@ async function loadExpenses() {
         const res = await response.json();
         if (res.status === 'success' && res.data && res.data.length > 0) {
             tbody.innerHTML = res.data.map(item => `
-                <tr>
+                <tr id="row-${item.id}">
                     <td>${formatDate(item.Fecha)}</td>
                     <td>${item.Proveedor || '-'}</td>
+                    <td>${item.Tipo || 'Factura'}</td>
                     <td><span class="badge">${item.Categoria || 'General'}</span></td>
                     <td>S/ ${parseFloat(item.Monto).toFixed(2)}</td>
                     <td>
                          ${item.fileUrl ? `<a href="${item.fileUrl}" target="_blank" class="action-btn"><i class="ph ph-file-pdf"></i> Ver</a>` : '<span class="text-muted">-</span>'}
+                    </td>
+                    <td>
+                        <button class="action-btn text-danger" onclick="deleteExpense('${item.id}')" title="Eliminar"><i class="ph ph-trash"></i></button>
                     </td>
                 </tr>
             `).join('');
@@ -597,13 +604,51 @@ async function loadExpenses() {
             if (countEl) countEl.textContent = res.data.length;
 
         } else {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">No hay gastos registrados.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No hay gastos registrados.</td></tr>';
         }
     } catch (e) {
         console.error(e);
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center warning">Error al cargar.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center warning">Error al cargar.</td></tr>';
     }
 }
+
+// Global scope for onclick
+window.deleteExpense = async function (id) {
+    if (!confirm('¿Estás seguro de que deseas eliminar este gasto?')) return;
+
+    // Optimistic UI
+    const row = document.getElementById(`row-${id}`);
+    if (row) row.style.opacity = '0.5';
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'delete',
+                table: 'Gastos',
+                userRole: state.user.role,
+                payload: { id: id }
+            })
+        });
+        const res = await response.json();
+
+        if (res.status === 'success') {
+            if (row) row.remove();
+            // Update total? Might be too expensive to recalculate completely without reload, 
+            // but we can try subtracting or just re-load. Let's re-load for accuracy.
+            loadExpenses();
+        } else {
+            alert('Error al eliminar: ' + res.message);
+            if (row) row.style.opacity = '1';
+        }
+
+    } catch (e) {
+        console.error(e);
+        alert('Error de conexión');
+        if (row) row.style.opacity = '1';
+    }
+};
 
 async function loadIncome() {
     const tbody = document.getElementById('income-list');
