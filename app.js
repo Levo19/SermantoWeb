@@ -1022,3 +1022,288 @@ window.deleteService = async function (id) {
         alert('Error de conexión');
     }
 };
+
+// --- Inventory Module Logic ---
+
+function switchInventoryTab(tabName) {
+    document.querySelectorAll('#inventory-view .tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('#inventory-view .tab-content').forEach(content => content.classList.add('hidden'));
+
+    if (tabName === 'tools') {
+        document.querySelector(`#inventory-view .tab-btn[onclick="switchInventoryTab('tools')"]`).classList.add('active');
+        document.getElementById('tab-tools').classList.remove('hidden');
+    } else {
+        document.querySelector(`#inventory-view .tab-btn[onclick="switchInventoryTab('mermas')"]`).classList.add('active');
+        document.getElementById('tab-mermas').classList.remove('hidden');
+    }
+}
+
+// Tool Modals
+function openToolModal() {
+    openModal('tool-modal');
+}
+
+function openMermaModal(toolId, toolName, maxQty) {
+    document.getElementById('merma-tool-id').value = toolId;
+    document.getElementById('merma-tool-name').value = toolName;
+
+    const qtyInput = document.querySelector('#merma-form input[name="Cantidad"]');
+    qtyInput.max = maxQty;
+    qtyInput.value = "";
+
+    document.getElementById('merma-max-qty').textContent = maxQty;
+    openModal('merma-modal');
+}
+
+// Data Handling
+async function loadTools(silent = false) {
+    const tbody = document.getElementById('tools-list');
+    if (!silent) tbody.innerHTML = '<tr><td colspan="7" class="text-center">Cargando inventario...</td></tr>';
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'db', op: 'read', table: 'Herramientas', userRole: state.user.role })
+        });
+        const res = await response.json();
+        if (res.status === 'success') {
+            state.data.tools = res.data;
+            renderTools(res.data);
+        } else if (!silent) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No hay herramientas registradas.</td></tr>';
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function loadMermas(silent = false) {
+    const tbody = document.getElementById('mermas-list');
+    if (!silent) tbody.innerHTML = '<tr><td colspan="6" class="text-center">Cargando reportes...</td></tr>';
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'db', op: 'read', table: 'Mermas', userRole: state.user.role })
+        });
+        const res = await response.json();
+        if (res.status === 'success') {
+            state.data.mermas = res.data;
+            renderMermas(res.data);
+        } else if (!silent) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No hay mermas reportadas.</td></tr>';
+        }
+    } catch (e) { console.error(e); }
+}
+
+function renderTools(data) {
+    const tbody = document.getElementById('tools-list');
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">No hay herramientas.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = data.map(item => {
+        // Stock Logic: If available not set, default to Total (legacy/first create)
+        const total = parseInt(item.StockTotal) || 0;
+        const available = item.StockDisponible !== undefined ? parseInt(item.StockDisponible) : total;
+
+        let statusBadge = '<span class="badge success">Optimo</span>';
+        if (available === 0) statusBadge = '<span class="badge danger">Agotado</span>';
+        else if (available < total * 0.3) statusBadge = '<span class="badge warning">Bajo Stock</span>';
+
+        return `
+            <tr>
+                <td><strong>${item.Nombre}</strong></td>
+                <td>${item.Descripcion || '-'}</td>
+                <td>S/ ${parseFloat(item.CostoReposicion || 0).toFixed(2)}</td>
+                <td class="text-muted">${total}</td>
+                <td style="font-weight:bold; color:${available > 0 ? '#10b981' : '#ef4444'}">${available}</td>
+                <td>${statusBadge}</td>
+                <td>
+                    ${available > 0 ?
+                `<button class="action-btn" title="Reportar Merma/Daño" onclick="openMermaModal('${item.id}', '${item.Nombre}', ${available})">
+                            <i class="ph ph-warning-circle text-danger"></i>
+                        </button>`
+                : '-'}
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function renderMermas(data) {
+    const tbody = document.getElementById('mermas-list');
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No hay mermas activas.</td></tr>';
+        return;
+    }
+
+    // Sort: 'En Revision' first
+    const sortedDetails = [...data].sort((a, b) => {
+        if (a.Estado === 'En Revision' && b.Estado !== 'En Revision') return -1;
+        if (a.Estado !== 'En Revision' && b.Estado === 'En Revision') return 1;
+        return 0;
+    });
+
+    tbody.innerHTML = sortedDetails.map(item => {
+        // Find Tool Name
+        const tool = state.data.tools ? state.data.tools.find(t => t.id === item.HerramientaId) : null;
+        const toolName = tool ? tool.Nombre : 'Herramienta Eliminada';
+
+        let actions = '-';
+        if (item.Estado === 'En Revision') {
+            actions = `
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn btn-success btn-sm" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="resolveMerma('${item.id}', 'Recuperar', '${item.HerramientaId}', ${item.Cantidad})">
+                        Recuperar
+                    </button>
+                    <button class="btn btn-primary btn-sm" style="padding:0.25rem 0.5rem; font-size:0.75rem; background:#ef4444;" onclick="resolveMerma('${item.id}', 'Baja', '${item.HerramientaId}', ${item.Cantidad})">
+                        Dar Baja
+                    </button>
+                </div>
+            `;
+        }
+
+        let badgeClass = 'warning'; // En Revision
+        if (item.Estado === 'Recuperado') badgeClass = 'success';
+        if (item.Estado === 'Baja') badgeClass = 'danger';
+
+        return `
+            <tr>
+                <td>${formatDate(item.FechaReporte)}</td>
+                <td>${toolName}</td>
+                <td><strong>${item.Cantidad}</strong></td>
+                <td>${item.Motivo}</td>
+                <td><span class="badge ${badgeClass}">${item.Estado}</span></td>
+                <td>${actions}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Actions
+
+// CREATE TOOL
+document.getElementById('tool-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+
+    const formData = new FormData(e.target);
+    const payload = Object.fromEntries(formData.entries());
+    // Initial Available = Total
+    payload.StockDisponible = payload.StockTotal;
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'db', op: 'create', table: 'Herramientas', userRole: state.user.role, payload: payload })
+        });
+        const res = await response.json();
+        if (res.status === 'success') {
+            alert('Herramienta registrada');
+            closeModal('tool-modal');
+            e.target.reset();
+            loadTools();
+        } else {
+            alert(res.message);
+        }
+    } catch (e) { alert('Error conexión'); }
+    finally { btn.disabled = false; }
+});
+
+// REPORT MERMA
+document.getElementById('merma-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+
+    const formData = new FormData(e.target);
+    const toolId = formData.get('HerramientaId');
+    const qty = parseInt(formData.get('Cantidad'));
+
+    // 1. Create Merma Record
+    const mermaPayload = {
+        HerramientaId: toolId,
+        Cantidad: qty,
+        Motivo: formData.get('Motivo'),
+        Estado: 'En Revision',
+        FechaReporte: new Date().toISOString()
+    };
+
+    // 2. Update Tool Stock (Decrease Available)
+    const tool = state.data.tools.find(t => t.id === toolId);
+    if (!tool) return;
+
+    const newAvailable = parseInt(tool.StockDisponible || tool.StockTotal) - qty;
+
+    try {
+        // Create Merma
+        await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'db', op: 'create', table: 'Mermas', userRole: state.user.role, payload: mermaPayload })
+        });
+
+        // Update Tool
+        await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db', op: 'update', table: 'Herramientas', userRole: state.user.role,
+                payload: { id: toolId, StockDisponible: newAvailable }
+            })
+        });
+
+        alert('Merma reportada exitosamente');
+        closeModal('merma-modal');
+        e.target.reset();
+
+        // Refresh
+        loadTools();
+        loadMermas();
+
+    } catch (e) { alert('Error conexión'); }
+    finally { btn.disabled = false; }
+});
+
+// RESOLVE MERMA
+window.resolveMerma = async function (mermaId, action, toolId, qty) {
+    if (!confirm(`¿Confirmar acción: ${action}?`)) return;
+
+    try {
+        // 1. Update Merma Status
+        await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db', op: 'update', table: 'Mermas', userRole: state.user.role,
+                payload: { id: mermaId, Estado: action === 'Recuperar' ? 'Recuperado' : 'Baja' }
+            })
+        });
+
+        // 2. If 'Recuperar', Return to Stock. If 'Baja', Reduce Total Stock.
+        const tool = state.data.tools.find(t => t.id === toolId);
+        if (tool) {
+            let updatePayload = { id: toolId };
+            let currentAvailable = parseInt(tool.StockDisponible || 0);
+            let currentTotal = parseInt(tool.StockTotal || 0);
+
+            if (action === 'Recuperar') {
+                updatePayload.StockDisponible = currentAvailable + parseInt(qty);
+            } else {
+                // Baja: Available stays same (it was already removed), but Total decreases
+                updatePayload.StockTotal = currentTotal - parseInt(qty);
+            }
+
+            await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'db', op: 'update', table: 'Herramientas', userRole: state.user.role,
+                    payload: updatePayload
+                })
+            });
+        }
+
+        alert('Acción registrada');
+        loadTools();
+        loadMermas();
+
+    } catch (e) { alert('Error conexión'); }
+};
