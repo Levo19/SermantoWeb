@@ -5,7 +5,16 @@
 // State
 const state = {
     user: null,
-    currentView: 'auth'
+    currentView: 'auth',
+    data: {
+        expenses: null,
+        income: null
+    },
+    lastUpdated: {
+        expenses: null,
+        income: null
+    },
+    intervals: []
 };
 
 // DOM Elements
@@ -214,9 +223,17 @@ function loginUser(user) {
     toggleLayout(true); // Show Sidebar
     updateSidebarPermissions(); // Show Admin Menu if needed
 
-    // Preload Data
+    // Preload Data (Initial Load)
     loadExpenses();
     loadIncome();
+
+    // Start Background Polling (Every 60s)
+    const intervalId = setInterval(() => {
+        console.log('Syncing data in background...');
+        loadExpenses(true);
+        loadIncome(true);
+    }, 60000);
+    state.intervals.push(intervalId);
 
     switchView('home-view');
 }
@@ -236,7 +253,12 @@ function renderUserNav() {
 }
 
 function logout() {
+    // Clear Intervals
+    state.intervals.forEach(clearInterval);
+    state.intervals = [];
+
     state.user = null;
+    state.data = { expenses: null, income: null }; // Clear Cache
     localStorage.removeItem('sermanto_user');
     location.reload();
 }
@@ -370,8 +392,12 @@ function switchView(viewName) {
     if (viewName === 'finances-view') {
         const date = new Date().toLocaleDateString();
         document.getElementById('finance-date').textContent = date;
-        loadExpenses();
-        loadIncome();
+
+        // Data is now preloaded/cached.
+        // We can optionally trigger a silent refresh if data is too old, 
+        // but for now, rely on background polling + cache.
+        if (!state.data.expenses) loadExpenses();
+        if (!state.data.income) loadIncome();
     }
 }
 
@@ -562,9 +588,16 @@ document.getElementById('income-form').addEventListener('submit', async (e) => {
 
 // --- Data Loading Functions ---
 
-async function loadExpenses() {
+async function loadExpenses(silent = false) {
     const tbody = document.getElementById('expenses-list');
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center">Cargando datos...</td></tr>';
+
+    // 1. Cache Check (Immediate Render)
+    if (!silent && state.data.expenses) {
+        renderExpenses(state.data.expenses);
+        // We still fetch in background to update, but user sees data immediately
+    } else if (!silent) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">Cargando datos...</td></tr>';
+    }
 
     try {
         const response = await fetch(API_URL, {
@@ -577,39 +610,57 @@ async function loadExpenses() {
             })
         });
         const res = await response.json();
-        if (res.status === 'success' && res.data && res.data.length > 0) {
-            tbody.innerHTML = res.data.map(item => `
-                <tr id="row-${item.id}">
-                    <td>${formatDate(item.Fecha)}</td>
-                    <td>${item.Proveedor || '-'}</td>
-                    <td>${item.Tipo || 'Factura'}</td>
-                    <td><span class="badge">${item.Categoria || 'General'}</span></td>
-                    <td>S/ ${parseFloat(item.Monto).toFixed(2)}</td>
-                    <td>
-                         ${item.fileUrl ? `<a href="${item.fileUrl}" target="_blank" class="action-btn"><i class="ph ph-file-pdf"></i> Ver</a>` : '<span class="text-muted">-</span>'}
-                    </td>
-                    <td>
-                        <button class="action-btn text-danger" onclick="deleteExpense('${item.id}')" title="Eliminar"><i class="ph ph-trash"></i></button>
-                    </td>
-                </tr>
-            `).join('');
 
-            // Calculate Monthly Total
-            const total = res.data.reduce((acc, curr) => acc + (parseFloat(curr.Monto) || 0), 0);
-            const totalEl = document.querySelector('#tab-expenses .mini-stats .value');
-            if (totalEl) totalEl.textContent = `S/ ${total.toFixed(2)}`;
+        if (res.status === 'success') {
+            // Update Cache
+            state.data.expenses = res.data;
+            state.lastUpdated.expenses = new Date();
 
-            // Pending Count (Mock)
-            const countEl = document.querySelector('#tab-expenses .mini-stats .value.warning');
-            if (countEl) countEl.textContent = res.data.length;
-
-        } else {
+            // Render
+            renderExpenses(res.data);
+        } else if (!silent) {
             tbody.innerHTML = '<tr><td colspan="7" class="text-center">No hay gastos registrados.</td></tr>';
         }
     } catch (e) {
         console.error(e);
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center warning">Error al cargar.</td></tr>';
+        if (!silent) tbody.innerHTML = '<tr><td colspan="7" class="text-center warning">Error al cargar.</td></tr>';
     }
+}
+
+function renderExpenses(data) {
+    const tbody = document.getElementById('expenses-list');
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">No hay gastos registrados.</td></tr>';
+        return;
+    }
+
+    // Sort by Date Descending
+    const sortedData = [...data].sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+
+    tbody.innerHTML = sortedData.map(item => `
+        <tr id="row-${item.id}">
+            <td>${formatDate(item.Fecha)}</td>
+            <td>${item.Proveedor || '-'}</td>
+            <td>${item.Tipo || 'Factura'}</td>
+            <td><span class="badge">${item.Categoria || 'General'}</span></td>
+            <td>S/ ${parseFloat(item.Monto).toFixed(2)}</td>
+            <td>
+                    ${item.fileUrl ? `<a href="${item.fileUrl}" target="_blank" class="action-btn"><i class="ph ph-file-pdf"></i> Ver</a>` : '<span class="text-muted">-</span>'}
+            </td>
+            <td>
+                <button class="action-btn text-danger" onclick="deleteExpense('${item.id}')" title="Eliminar"><i class="ph ph-trash"></i></button>
+            </td>
+        </tr>
+    `).join('');
+
+    // Calculate Monthly Total
+    const total = data.reduce((acc, curr) => acc + (parseFloat(curr.Monto) || 0), 0);
+    const totalEl = document.querySelector('#tab-expenses .mini-stats .value');
+    if (totalEl) totalEl.textContent = `S/ ${total.toFixed(2)}`;
+
+    // Pending Count (Mock)
+    const countEl = document.querySelector('#tab-expenses .mini-stats .value.warning');
+    if (countEl) countEl.textContent = data.length;
 }
 
 // Global scope for onclick
@@ -650,9 +701,15 @@ window.deleteExpense = async function (id) {
     }
 };
 
-async function loadIncome() {
+async function loadIncome(silent = false) {
     const tbody = document.getElementById('income-list');
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center">Cargando datos...</td></tr>';
+
+    // 1. Cache Check
+    if (!silent && state.data.income) {
+        renderIncome(state.data.income);
+    } else if (!silent) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">Cargando datos...</td></tr>';
+    }
 
     try {
         const response = await fetch(API_URL, {
@@ -665,23 +722,38 @@ async function loadIncome() {
             })
         });
         const res = await response.json();
-        if (res.status === 'success' && res.data && res.data.length > 0) {
-            tbody.innerHTML = res.data.map(item => `
-                <tr>
-                    <td>${formatDate(item.Fecha)}</td>
-                    <td>${item.Cliente || '-'}</td>
-                    <td>${item.Contrato || '-'}</td>
-                    <td>S/ ${parseFloat(item.Monto).toFixed(2)}</td>
-                    <td><span class="badge success">Registrado</span></td>
-                </tr>
-            `).join('');
-        } else {
+
+        if (res.status === 'success') {
+            state.data.income = res.data;
+            state.lastUpdated.income = new Date();
+            renderIncome(res.data);
+        } else if (!silent) {
             tbody.innerHTML = '<tr><td colspan="5" class="text-center">No hay ingresos registrados.</td></tr>';
         }
     } catch (e) {
         console.error(e);
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center warning">Error al cargar.</td></tr>';
+        if (!silent) tbody.innerHTML = '<tr><td colspan="5" class="text-center warning">Error al cargar.</td></tr>';
     }
+}
+
+function renderIncome(data) {
+    const tbody = document.getElementById('income-list');
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">No hay ingresos registrados.</td></tr>';
+        return;
+    }
+
+    // Sort logic can be added here if needed
+
+    tbody.innerHTML = data.map(item => `
+        <tr>
+            <td>${formatDate(item.Fecha)}</td>
+            <td>${item.Cliente || '-'}</td>
+            <td>${item.Contrato || '-'}</td>
+            <td>S/ ${parseFloat(item.Monto).toFixed(2)}</td>
+            <td><span class="badge success">Registrado</span></td>
+        </tr>
+    `).join('');
 }
 
 function formatDate(dateString) {
