@@ -9,12 +9,16 @@ const state = {
     data: {
         expenses: null,
         income: null,
-        services: null
+        services: null,
+        tools: null,
+        mermas: null
     },
     lastUpdated: {
         expenses: null,
         income: null,
-        services: null
+        services: null,
+        tools: null,
+        mermas: null
     },
     intervals: []
 };
@@ -229,6 +233,8 @@ function loginUser(user) {
     loadExpenses();
     loadIncome();
     loadServices();
+    loadTools();
+    loadMermas();
 
     // Start Background Polling (Every 60s)
     const intervalId = setInterval(() => {
@@ -236,6 +242,8 @@ function loginUser(user) {
         loadExpenses(true);
         loadIncome(true);
         loadServices(true);
+        loadTools(true);
+        loadMermas(true);
     }, 60000);
     state.intervals.push(intervalId);
 
@@ -262,7 +270,7 @@ function logout() {
     state.intervals = [];
 
     state.user = null;
-    state.data = { expenses: null, income: null, services: null }; // Clear Cache
+    state.data = { expenses: null, income: null, services: null, tools: null, mermas: null }; // Clear Cache
     localStorage.removeItem('sermanto_user');
     location.reload();
 }
@@ -406,6 +414,13 @@ function switchView(viewName) {
 
     if (viewName === 'services-view') {
         if (!state.data.services) loadServices();
+    }
+
+    if (viewName === 'inventory-view') {
+        document.getElementById('inventory-date').textContent = new Date().toLocaleDateString();
+        // Load both to correlate data
+        loadTools();
+        loadMermas();
     }
 }
 
