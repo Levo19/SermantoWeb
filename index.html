@@ -415,23 +415,45 @@
             </div>
             <form id="merma-form">
                 <input type="hidden" name="HerramientaId" id="merma-tool-id">
+
                 <div class="form-group">
                     <label class="form-label">Herramienta</label>
                     <input type="text" id="merma-tool-name" class="form-input" readonly style="background:#f1f5f9;">
                 </div>
+
                 <div class="form-group">
-                    <label class="form-label">Cantidad Dañada</label>
-                    <input type="number" name="Cantidad" class="form-input" min="1" required>
-                    <small class="text-muted">Máximo disponible: <span id="merma-max-qty">0</span></small>
+                    <div class="row" style="display:flex; gap:1rem;">
+                        <div style="flex:1">
+                            <label class="form-label">Stock Sistema</label>
+                            <input type="number" id="merma-system-stock" class="form-input" readonly
+                                style="background:#f1f5f9; font-weight:bold;">
+                        </div>
+                        <div style="flex:1">
+                            <label class="form-label">Conteo Físico</label>
+                            <input type="number" name="ConteoFisico" id="merma-physical-count" class="form-input"
+                                required min="0" oninput="calculateDifference()">
+                        </div>
+                    </div>
                 </div>
+
+                <div class="form-group">
+                    <label class="form-label">Diferencia (Ajuste)</label>
+                    <input type="text" id="merma-difference" class="form-input" readonly
+                        style="background:#f1f5f9; font-weight:bold;">
+                    <input type="hidden" name="Cantidad" id="merma-quantity">
+                </div>
+
                 <div class="form-group">
                     <label class="form-label">Motivo / Observación</label>
-                    <textarea name="Motivo" class="form-input" rows="3"
-                        placeholder="Ej. Roto durante operación en nave..." required></textarea>
+                    <textarea name="Motivo" class="form-input" rows="3" placeholder="Ej. No se encontró en almacén..."
+                        required></textarea>
                 </div>
-                <button type="submit" class="btn btn-primary" style="background:#ef4444;">Reportar Merma</button>
+
+                <button type="submit" class="btn btn-primary" id="merma-submit-btn">Guardar Auditoría</button>
             </form>
         </div>
+    </div>
+    </div>
     </div>
 
     <!-- Service Modal -->
