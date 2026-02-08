@@ -648,7 +648,6 @@ body {
     border-radius: var(--radius-lg);
 }
 
-.service-card:hover .card-inner,
 .service-card.flipped .card-inner {
     transform: rotateY(180deg);
 }
