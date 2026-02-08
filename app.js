@@ -8,11 +8,13 @@ const state = {
     currentView: 'auth',
     data: {
         expenses: null,
-        income: null
+        income: null,
+        services: null
     },
     lastUpdated: {
         expenses: null,
-        income: null
+        income: null,
+        services: null
     },
     intervals: []
 };
@@ -226,12 +228,14 @@ function loginUser(user) {
     // Preload Data (Initial Load)
     loadExpenses();
     loadIncome();
+    loadServices();
 
     // Start Background Polling (Every 60s)
     const intervalId = setInterval(() => {
         console.log('Syncing data in background...');
         loadExpenses(true);
         loadIncome(true);
+        loadServices(true);
     }, 60000);
     state.intervals.push(intervalId);
 
@@ -258,7 +262,7 @@ function logout() {
     state.intervals = [];
 
     state.user = null;
-    state.data = { expenses: null, income: null }; // Clear Cache
+    state.data = { expenses: null, income: null, services: null }; // Clear Cache
     localStorage.removeItem('sermanto_user');
     location.reload();
 }
@@ -398,6 +402,10 @@ function switchView(viewName) {
         // but for now, rely on background polling + cache.
         if (!state.data.expenses) loadExpenses();
         if (!state.data.income) loadIncome();
+    }
+
+    if (viewName === 'services-view') {
+        if (!state.data.services) loadServices();
     }
 }
 
@@ -586,6 +594,83 @@ document.getElementById('income-form').addEventListener('submit', async (e) => {
     }
 });
 
+// Service Modal & Logic
+function openServiceModal() {
+    openModal('service-modal');
+}
+
+// Service Form Submit
+document.getElementById('service-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    const originalText = btn.innerText;
+    btn.innerText = "Guardando...";
+
+    const formData = new FormData(e.target);
+    const fileInput = document.getElementById('service-file-input');
+    const file = fileInput.files[0];
+
+    // Optimistic UI
+    // (We could implement optimistic rendering here like expenses if desired, 
+    // but for catalog items, a small wait is usually acceptable. Let's do simple wait for now)
+
+    try {
+        let fileUrl = '';
+
+        // 1. Upload Photo if exists
+        if (file) {
+            const base64 = await toBase64(file);
+            const uploadResp = await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'uploadInvoice', // Reusing upload logic (stores in Finance folder, maybe we should change folder but ok for now)
+                    fileName: 'SVC-' + file.name,
+                    mimeType: file.type,
+                    fileBase64: base64
+                })
+            });
+            const uploadResult = await uploadResp.json();
+            if (uploadResult.status === 'success') {
+                fileUrl = uploadResult.fileUrl;
+            }
+        }
+
+        // 2. Save to DB
+        const payload = Object.fromEntries(formData.entries());
+        payload.FotoUrl = fileUrl;
+
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'create',
+                table: 'Servicios',
+                userRole: state.user.role,
+                payload: payload
+            })
+        });
+
+        const res = await response.json();
+
+        if (res.status === 'success') {
+            alert('Servicio creado correctamente');
+            closeModal('service-modal');
+            e.target.reset();
+            loadServices(false); // Force refresh
+        } else {
+            alert('Error: ' + res.message);
+        }
+
+    } catch (error) {
+        console.error(error);
+        alert('Error de conexión');
+    } finally {
+        btn.disabled = false;
+        btn.innerText = originalText;
+    }
+});
+
 // --- Data Loading Functions ---
 
 async function loadExpenses(silent = false) {
@@ -763,3 +848,100 @@ function formatDate(dateString) {
     if (isNaN(date)) return dateString;
     return date.toLocaleDateString();
 }
+
+async function loadServices(silent = false) {
+    const tbody = document.getElementById('services-list');
+
+    if (!silent && state.data.services) {
+        renderServices(state.data.services);
+    } else if (!silent) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center">Cargando catálogo...</td></tr>';
+    }
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'read',
+                table: 'Servicios',
+                userRole: state.user.role
+            })
+        });
+        const res = await response.json();
+
+        if (res.status === 'success') {
+            state.data.services = res.data;
+            state.lastUpdated.services = new Date();
+            renderServices(res.data);
+        } else if (!silent) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No hay servicios registrados.</td></tr>';
+        }
+    } catch (e) {
+        console.error(e);
+        if (!silent) tbody.innerHTML = '<tr><td colspan="8" class="text-center warning">Error al cargar.</td></tr>';
+    }
+}
+
+function renderServices(data) {
+    const tbody = document.getElementById('services-list');
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center">No hay servicios registrados.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = data.map(item => {
+        const cost = parseFloat(item.CostoUnitario) || 0;
+        const price = parseFloat(item.PrecioUnitario) || 0;
+        const margin = price > 0 ? ((price - cost) / price * 100).toFixed(1) : 0;
+        const currency = item.Moneda === 'USD' ? '$' : 'S/';
+
+        return `
+            <tr>
+                <td><strong>${item.Nombre}</strong></td>
+                <td><small>${item.Descripcion || '-'}</small></td>
+                <td><span class="badge">${item.UnidadMedida}</span></td>
+                <td>${currency} ${cost.toFixed(2)}</td>
+                <td>${currency} ${price.toFixed(2)}</td>
+                <td>
+                    <span class="badge ${margin > 30 ? 'success' : (margin > 15 ? 'warning' : 'danger')}">
+                        ${margin}%
+                    </span>
+                </td>
+                <td>
+                    ${item.FotoUrl ? `<a href="${item.FotoUrl}" target="_blank" class="action-btn"><i class="ph ph-image"></i></a>` : '-'}
+                </td>
+                <td>
+                     <button class="action-btn text-danger" onclick="deleteService('${item.id}')" title="Eliminar"><i class="ph ph-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+window.deleteService = async function (id) {
+    if (!confirm('¿Eliminar este servicio del catálogo?')) return;
+
+    // Optimistic Remove
+    // For now simple reload pattern
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'delete',
+                table: 'Servicios',
+                userRole: state.user.role,
+                payload: { id: id }
+            })
+        });
+        const res = await response.json();
+        if (res.status === 'success') {
+            loadServices(false);
+        } else {
+            alert(res.message);
+        }
+    } catch (e) {
+        alert('Error de conexión');
+    }
+};
