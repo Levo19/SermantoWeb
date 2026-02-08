@@ -1126,42 +1126,75 @@ async function loadMermas(silent = false) {
 }
 
 function renderTools(data) {
-    const tbody = document.getElementById('tools-list');
+    const grid = document.getElementById('tools-list');
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center">No hay herramientas.</td></tr>';
+        grid.innerHTML = '<div class="text-center" style="grid-column: 1/-1;">No hay herramientas registradas.</div>';
         return;
     }
 
-    tbody.innerHTML = data.map(item => {
-        // Stock Logic: If available not set, default to Total (legacy/first create)
+    grid.innerHTML = data.map(item => {
+        // Stock Logic
         const total = parseInt(item.StockTotal) || 0;
         const available = item.StockDisponible !== undefined ? parseInt(item.StockDisponible) : total;
 
-        let statusBadge = '<span class="badge success">Optimo</span>';
-        if (available === 0) statusBadge = '<span class="badge danger">Agotado</span>';
-        else if (available < total * 0.3) statusBadge = '<span class="badge warning">Bajo Stock</span>';
+        let statusClass = 'success';
+        let statusText = 'Optimo';
+        if (available === 0) { statusClass = 'danger'; statusText = 'Agotado'; }
+        else if (available < total * 0.3) { statusClass = 'warning'; statusText = 'Bajo Stack'; }
 
         // Image Logic
         let displayUrl = formatDriveImage(item.FotoUrl);
-        const imgTag = displayUrl
-            ? `<a href="${displayUrl}" target="_blank"><img src="${displayUrl}" style="width:40px; height:40px; object-fit:cover; border-radius:4px;" referrerpolicy="no-referrer"></a>`
-            : '<span class="text-muted">-</span>';
+        if (!displayUrl || displayUrl.trim() === '') {
+            const name = encodeURIComponent(item.Nombre.substring(0, 20));
+            displayUrl = `https://ui-avatars.com/api/?name=${name}&background=f1f5f9&color=64748b&size=400&font-size=0.33&length=2`;
+        }
 
         return `
-            <tr>
-                <td><strong>${item.Nombre}</strong></td>
-                <td class="text-center">${imgTag}</td>
-                <td>${item.Descripcion || '-'}</td>
-                <td>S/ ${parseFloat(item.CostoReposicion || 0).toFixed(2)}</td>
-                <td class="text-muted">${total}</td>
-                <td style="font-weight:bold; color:${available > 0 ? '#10b981' : '#ef4444'}">${available}</td>
-                <td>${statusBadge}</td>
-                <td>
-                    <button class="action-btn" title="Realizar Auditoría" onclick="openMermaModal('${item.id}', '${item.Nombre}', ${available})">
-                        <i class="ph ph-clipboard-text text-primary"></i>
-                    </button>
-                </td>
-            </tr>
+            <div class="service-card" onclick="this.classList.toggle('flipped')">
+                <div class="card-inner">
+                    <!-- Front -->
+                    <div class="card-front">
+                        <div class="card-img-container" style="width:100%; height:180px; overflow:hidden; background:#f0f0f0; display:flex; align-items:center; justify-content:center;">
+                             <img src="${displayUrl}" alt="${item.Nombre}" class="card-img" style="width:100%; height:100%; object-fit:cover;" referrerpolicy="no-referrer" loading="lazy" onerror="this.src='https://placehold.co/400x300?text=No+Image'">
+                        </div>
+                        <div class="card-content">
+                            <div>
+                                <h3 class="card-title">${item.Nombre}</h3>
+                                <div style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-top:0.5rem;">
+                                    <span class="badge ${statusClass}">${statusText}</span>
+                                    <span style="font-size:0.9rem; color:#64748b; font-weight:600;">Stock: ${available} / ${total}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Back -->
+                    <div class="card-back">
+                        <h4>Detalles</h4>
+                        <p>${item.Descripcion || 'Sin descripción'}</p>
+                        
+                        <div class="data-row">
+                            <span>Costo Reposición:</span>
+                            <strong>S/ ${parseFloat(item.CostoReposicion || 0).toFixed(2)}</strong>
+                        </div>
+                        <div class="data-row">
+                            <span>Total:</span>
+                            <strong>${total} und.</strong>
+                        </div>
+                         <div class="data-row">
+                            <span>Disponible:</span>
+                            <strong style="color:${available > 0 ? '#4ade80' : '#f87171'}">${available} und.</strong>
+                        </div>
+
+                        <div class="card-actions">
+                             <button class="btn-icon-circle" title="Realizar Auditoría" onclick="event.stopPropagation(); openMermaModal('${item.id}', '${item.Nombre}', ${available})">
+                                <i class="ph ph-clipboard-text"></i>
+                            </button>
+                             <!-- Add Edit/Delete actions here if needed later -->
+                        </div>
+                    </div>
+                </div>
+            </div>
         `;
     }).join('');
 }
