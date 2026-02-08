@@ -1074,15 +1074,19 @@ function openToolModal() {
     openModal('tool-modal');
 }
 
-function openMermaModal(toolId, toolName, maxQty) {
+function openMermaModal(toolId, toolName, currentStock) {
     document.getElementById('merma-tool-id').value = toolId;
     document.getElementById('merma-tool-name').value = toolName;
 
-    const qtyInput = document.querySelector('#merma-form input[name="Cantidad"]');
-    qtyInput.max = maxQty;
-    qtyInput.value = "";
+    // Set System Stock for calculation
+    document.getElementById('merma-system-stock').value = currentStock;
 
-    document.getElementById('merma-max-qty').textContent = maxQty;
+    // Reset other fields
+    document.getElementById('merma-physical-count').value = '';
+    document.getElementById('merma-difference').value = '';
+    document.getElementById('merma-quantity').value = '';
+    document.querySelector('#merma-form textarea[name="Motivo"]').value = '';
+
     openModal('merma-modal');
 }
 
@@ -1253,86 +1257,238 @@ function renderMermas(data) {
 
 // CREATE TOOL
 // CREATE TOOL (Optimistic)
+// --- Unified Entry Workflow ---
+function openEntryModal() {
+    const form = document.getElementById('tool-form');
+    form.reset();
+
+    // Default to Existing
+    document.querySelector('input[name="EntryType"][value="existing"]').checked = true;
+    toggleEntryType();
+
+    // Populate Select
+    const select = document.getElementById('existing-tool-select');
+    select.innerHTML = '<option value="">-- Seleccionar --</option>';
+    if (state.data.tools) {
+        state.data.tools.forEach(t => {
+            select.innerHTML += `<option value="${t.id}">${t.Nombre}</option>`;
+        });
+    }
+
+    openModal('tool-modal');
+}
+
+window.toggleEntryType = function () {
+    const type = document.querySelector('input[name="EntryType"]:checked').value;
+    const existingSection = document.getElementById('section-existing');
+    const newSection = document.getElementById('section-new');
+    const fileInput = document.getElementById('tool-file-input');
+
+    if (type === 'existing') {
+        existingSection.classList.remove('hidden');
+        newSection.classList.add('hidden');
+        // Remove 'required' from new section inputs to avoid validation error
+        document.querySelector('input[name="Nombre"]').removeAttribute('required');
+        document.querySelector('input[name="StockTotal"]').removeAttribute('required');
+        document.querySelector('input[name="CostoReposicion"]').removeAttribute('required');
+        // Add required to existing
+        document.getElementById('existing-tool-select').setAttribute('required', 'true');
+        document.getElementById('entry-quantity').setAttribute('required', 'true');
+    } else {
+        existingSection.classList.add('hidden');
+        newSection.classList.remove('hidden');
+        // Add required to new section
+        document.querySelector('input[name="Nombre"]').setAttribute('required', 'true');
+        document.querySelector('input[name="StockTotal"]').setAttribute('required', 'true');
+        document.querySelector('input[name="CostoReposicion"]').setAttribute('required', 'true');
+        // Remove required from existing
+        document.getElementById('existing-tool-select').removeAttribute('required');
+        document.getElementById('entry-quantity').removeAttribute('required');
+    }
+}
+
+// Tool Form Handler (Unified)
 document.getElementById('tool-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    if (!formData.get('Nombre') || !formData.get('StockTotal')) return;
+    const type = formData.get('EntryType');
 
-    // 1. Optimistic Render
-    const payload = Object.fromEntries(formData.entries());
-    payload.StockDisponible = payload.StockTotal;
+    if (type === 'existing') {
+        // --- ADD STOCK LOGIC ---
+        const toolId = formData.get('ExistingToolId');
+        const qty = parseInt(formData.get('EntryQuantity'));
 
-    // Temp ID
-    const tempId = 'temp-' + Date.now();
-    const optimisticTool = {
-        id: tempId,
-        ...payload,
-        CostoReposicion: parseFloat(payload.CostoReposicion),
-        StockTotal: parseInt(payload.StockTotal),
-        StockDisponible: parseInt(payload.StockDisponible),
-        FotoUrl: ''
-    };
+        if (!toolId || isNaN(qty) || qty <= 0) return alert('Datos inválidos');
 
-    state.data.tools = state.data.tools || [];
-    state.data.tools.push(optimisticTool);
-    renderTools(state.data.tools);
+        const tool = state.data.tools.find(t => t.id === toolId);
+        if (!tool) return alert('Herramienta no encontrada');
 
-    closeModal('tool-modal');
-    e.target.reset();
+        // Optimistic Update
+        tool.StockTotal = parseInt(tool.StockTotal) + qty;
+        tool.StockDisponible = parseInt(tool.StockDisponible) + qty;
+        renderTools(state.data.tools);
+        closeModal('tool-modal');
 
-    // Toast
-    const toast = document.createElement('div');
-    toast.className = 'toast-notification';
-    toast.textContent = 'Guardando herramienta...';
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+        // Toast
+        showToast(`Ingresando ${qty} und. de ${tool.Nombre}...`);
 
-    // 2. Background Sync
-    try {
-        const fileInput = document.getElementById('tool-file-input');
-        const file = fileInput.files[0];
-        let fileUrl = '';
-
-        if (file) {
-            const base64 = await toBase64(file);
-            const uploadResp = await fetch(API_URL, {
+        // Background Sync using 'update' op
+        try {
+            await fetch(API_URL, {
                 method: 'POST',
                 body: JSON.stringify({
-                    action: 'uploadFile',
-                    module: 'inventory',
-                    fileName: 'TOOL-' + file.name,
-                    mimeType: file.type,
-                    fileBase64: base64
+                    action: 'db', op: 'update', table: 'Herramientas', userRole: state.user.role,
+                    payload: { id: toolId, StockTotal: tool.StockTotal, StockDisponible: tool.StockDisponible }
                 })
             });
-            const result = await uploadResp.json();
-            if (result.status === 'success') fileUrl = result.fileUrl;
+            // LOG MOVEMENT
+            await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'db', op: 'logMovement', table: 'Movimientos', userRole: state.user.role,
+                    payload: {
+                        ToolId: tool.id, ToolName: tool.Nombre, Type: 'Ingreso (Stock)',
+                        Quantity: qty, Reason: 'Ingreso Manual', User: state.user.username
+                    }
+                })
+            });
+
+            loadTools(true); // Silent reload to confirm
+        } catch (e) {
+            console.error(e);
+            loadTools(); // Revert
+            alert('Error al guardar ingreso.');
+
         }
 
-        payload.FotoUrl = fileUrl;
+    } else {
+        // --- NEW TOOL LOGIC ---
+        if (!formData.get('Nombre') || !formData.get('StockTotal')) return;
 
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'db', op: 'create', table: 'Herramientas', userRole: state.user.role, payload: payload })
-        });
-        const res = await response.json();
+        const payload = Object.fromEntries(formData.entries());
+        // Remove entry-specific fields from payload
+        delete payload.EntryType;
+        delete payload.ExistingToolId;
+        delete payload.EntryQuantity;
 
-        if (res.status === 'success') {
-            loadTools(true); // Silent reload to get real ID
-        } else {
-            console.error('Error:', res.message);
-            // Revert on error
+        payload.StockDisponible = payload.StockTotal;
+
+        // Temp ID
+        const tempId = 'temp-' + Date.now();
+        const optimisticTool = {
+            id: tempId,
+            ...payload,
+            CostoReposicion: parseFloat(payload.CostoReposicion),
+            StockTotal: parseInt(payload.StockTotal),
+            StockDisponible: parseInt(payload.StockDisponible),
+            FotoUrl: ''
+        };
+
+        state.data.tools = state.data.tools || [];
+        state.data.tools.push(optimisticTool);
+        renderTools(state.data.tools);
+
+        closeModal('tool-modal');
+        e.target.reset();
+
+        showToast('Guardando nueva herramienta...');
+
+        try {
+            const fileInput = document.getElementById('tool-file-input');
+            const file = fileInput.files[0];
+            let fileUrl = '';
+
+            if (file) {
+                const base64 = await toBase64(file);
+                const uploadResp = await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'uploadFile',
+                        module: 'inventory',
+                        fileName: 'TOOL-' + file.name,
+                        mimeType: file.type,
+                        fileBase64: base64
+                    })
+                });
+                const result = await uploadResp.json();
+                if (result.status === 'success') fileUrl = result.fileUrl;
+            }
+
+            payload.FotoUrl = fileUrl;
+
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'db', op: 'create', table: 'Herramientas', userRole: state.user.role, payload: payload })
+            });
+            const res = await response.json();
+
+            if (res.status === 'success') {
+                // LOG MOVEMENT (Initial Stock)
+                await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'db', op: 'logMovement', table: 'Movimientos', userRole: state.user.role,
+                        payload: {
+                            ToolId: res.id || 'N/A', ToolName: payload.Nombre, Type: 'Ingreso (Nuevo)',
+                            Quantity: payload.StockTotal, Reason: 'Creación de Item', User: state.user.username
+                        }
+                    })
+                });
+                loadTools(true);
+            } else {
+                console.error('Error:', res.message);
+                state.data.tools = state.data.tools.filter(t => t.id !== tempId);
+                renderTools(state.data.tools);
+                alert('Error al guardar: ' + res.message);
+            }
+        } catch (e) {
+            console.error(e);
             state.data.tools = state.data.tools.filter(t => t.id !== tempId);
             renderTools(state.data.tools);
-            alert('Error al guardar: ' + res.message);
+            alert('Error de conexión.');
         }
-    } catch (e) {
-        console.error(e);
-        state.data.tools = state.data.tools.filter(t => t.id !== tempId);
-        renderTools(state.data.tools);
-        alert('Error de conexión.');
     }
 });
+
+// History Logic
+window.openHistoryModal = async function () {
+    const tbody = document.getElementById('history-list');
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center">Cargando historial...</td></tr>';
+    openModal('history-modal');
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'db', op: 'read', table: 'Movimientos', userRole: state.user.role })
+        });
+        const res = await response.json();
+        if (res.status === 'success' && res.data) {
+            // Sort by Date Descending
+            const sorted = res.data.sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+
+            if (sorted.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center">No hay movimientos registrados.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = sorted.map(item => `
+                <tr>
+                    <td>${formatDate(item.Fecha)}</td>
+                    <td>${item.Herramienta || '-'}</td>
+                    <td><span class="badge ${item.Tipo.includes('Ingreso') ? 'success' : 'warning'}">${item.Tipo}</span></td>
+                    <td><strong>${item.Cantidad}</strong></td>
+                    <td>${item.Motivo}</td>
+                    <td>${item.Usuario}</td>
+                </tr>
+            `).join('');
+
+        } else {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No se pudo cargar el historial.</td></tr>';
+        }
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error de conexión.</td></tr>';
+    }
+}
 
 // REPORT MERMA
 // REPORT MERMA (Optimistic)
@@ -1386,11 +1542,36 @@ document.getElementById('merma-form').addEventListener('submit', async (e) => {
                 method: 'POST',
                 body: JSON.stringify({ action: 'db', op: 'update', table: 'Herramientas', userRole: state.user.role, payload: { id: toolId, StockDisponible: physicalCount } })
             });
+            // LOG MOVEMENT (Deficit)
+            const tool = state.data.tools.find(t => t.id === toolId);
+            await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'db', op: 'logMovement', table: 'Movimientos', userRole: state.user.role,
+                    payload: {
+                        ToolId: toolId, ToolName: tool ? tool.Nombre : '?', Type: 'Ajuste (Deficit)',
+                        Quantity: qty, Reason: `Auditoría: ${formData.get('Motivo')}`, User: state.user.username
+                    }
+                })
+            });
+
         } else {
             // Surplus
             await fetch(API_URL, {
                 method: 'POST',
                 body: JSON.stringify({ action: 'db', op: 'update', table: 'Herramientas', userRole: state.user.role, payload: { id: toolId, StockDisponible: physicalCount } })
+            });
+            // LOG MOVEMENT (Surplus)
+            const tool = state.data.tools.find(t => t.id === toolId);
+            await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'db', op: 'logMovement', table: 'Movimientos', userRole: state.user.role,
+                    payload: {
+                        ToolId: toolId, ToolName: tool ? tool.Nombre : '?', Type: 'Ajuste (Excedente)',
+                        Quantity: qty, Reason: `Auditoría: ${formData.get('Motivo')}`, User: state.user.username
+                    }
+                })
             });
         }
         loadTools(true);
@@ -1474,12 +1655,35 @@ window.resolveMerma = async function (mermaId, action, toolId, totalQty) {
                     payload: { id: toolId, StockDisponible: tool.StockDisponible }
                 })
             });
+            // LOG MOVEMENT (Recovery)
+            await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'db', op: 'logMovement', table: 'Movimientos', userRole: state.user.role,
+                    payload: {
+                        ToolId: toolId, ToolName: tool ? tool.Nombre : '?', Type: 'Reingreso (Recuperado)',
+                        Quantity: qtyToProcess, Reason: 'Recuperación de Merma', User: state.user.username
+                    }
+                })
+            });
+
         } else {
             await fetch(API_URL, {
                 method: 'POST',
                 body: JSON.stringify({
                     action: 'db', op: 'update', table: 'Herramientas', userRole: state.user.role,
                     payload: { id: toolId, StockTotal: tool.StockTotal }
+                })
+            });
+            // LOG MOVEMENT (Write-off)
+            await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'db', op: 'logMovement', table: 'Movimientos', userRole: state.user.role,
+                    payload: {
+                        ToolId: toolId, ToolName: tool ? tool.Nombre : '?', Type: 'Salida (Baja)',
+                        Quantity: qtyToProcess, Reason: 'Baja Definitiva', User: state.user.username
+                    }
                 })
             });
         }
