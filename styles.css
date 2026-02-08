@@ -566,6 +566,14 @@ body {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
+    gap: 1rem;
+}
+
+.dashboard-header-actions .btn {
+    width: auto;
+    min-width: 180px;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
 }
 
 /* Buttons Variants */
