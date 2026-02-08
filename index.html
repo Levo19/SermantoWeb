@@ -173,6 +173,7 @@
                                         <th>Stock Total</th>
                                         <th>Disponible</th>
                                         <th>Estado</th>
+                                        <th>Foto</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
@@ -360,78 +361,75 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Rol</label>
-                    <select name="Rol" class="form-input">
-                        <option value="operador">Operador</option>
-                        <option value="contador">Contador</option>
-                        <option value="admin">Administrador</option>
                     </select>
-                    <!-- Tool Modal -->
-                    <div id="tool-modal" class="modal-overlay hidden">
-                        <div class="modal-dialog">
-                            <div class="modal-header">
-                                <h3 class="modal-title">Nueva Herramienta</h3>
-                                <button class="close-btn" onclick="closeModal('tool-modal')">&times;</button>
-                            </div>
-                            <form id="tool-form">
-                                <div class="form-group">
-                                    <label class="form-label">Nombre Herramienta</label>
-                                    <input type="text" name="Nombre" class="form-input"
-                                        placeholder="Ej. Martillo Hidraulico" required>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Descripción</label>
-                                    <textarea name="Descripcion" class="form-input" rows="2"
-                                        placeholder="Detalles técnicos..."></textarea>
-                                </div>
-                                <div class="form-group">
-                                    <div class="row" style="display:flex; gap:1rem;">
-                                        <div style="flex:1">
-                                            <label class="form-label">Costo Reposición (S/)</label>
-                                            <input type="number" step="0.01" name="CostoReposicion" class="form-input"
-                                                required>
-                                        </div>
-                                        <div style="flex:1">
-                                            <label class="form-label">Stock Inicial</label>
-                                            <input type="number" name="StockTotal" class="form-input" required min="1">
-                                        </div>
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-primary">Guardar Herramienta</button>
-                            </form>
-                        </div>
-                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Guardar Usuario</button>
+            </form>
+        </div>
+    </div>
 
-                    <!-- Merma Report Modal -->
-                    <div id="merma-modal" class="modal-overlay hidden">
-                        <div class="modal-dialog">
-                            <div class="modal-header">
-                                <h3 class="modal-title">Reportar Daño / Auditoría</h3>
-                                <button class="close-btn" onclick="closeModal('merma-modal')">&times;</button>
-                            </div>
-                            <form id="merma-form">
-                                <input type="hidden" name="HerramientaId" id="merma-tool-id">
-                                <div class="form-group">
-                                    <label class="form-label">Herramienta</label>
-                                    <input type="text" id="merma-tool-name" class="form-input" readonly
-                                        style="background:#f1f5f9;">
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Cantidad Dañada</label>
-                                    <input type="number" name="Cantidad" class="form-input" min="1" required>
-                                    <small class="text-muted">Máximo disponible: <span
-                                            id="merma-max-qty">0</span></small>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Motivo / Observación</label>
-                                    <textarea name="Motivo" class="form-input" rows="3"
-                                        placeholder="Ej. Roto durante operación en nave..." required></textarea>
-                                </div>
-                                <button type="submit" class="btn btn-primary" style="background:#ef4444;">Reportar
-                                    Merma</button>
-                            </form>
+    <!-- Tool Modal -->
+    <div id="tool-modal" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title">Nueva Herramienta</h3>
+                <button class="close-btn" onclick="closeModal('tool-modal')">&times;</button>
+            </div>
+            <form id="tool-form">
+                <div class="form-group upload-mini-preview" id="tool-file-preview">
+                    <label class="form-label">Foto Herramienta</label>
+                    <input type="file" id="tool-file-input" accept="image/*" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nombre Herramienta</label>
+                    <input type="text" name="Nombre" class="form-input" placeholder="Ej. Martillo Hidraulico" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Descripción</label>
+                    <textarea name="Descripcion" class="form-input" rows="2"
+                        placeholder="Detalles técnicos..."></textarea>
+                </div>
+                <div class="form-group">
+                    <div class="row" style="display:flex; gap:1rem;">
+                        <div style="flex:1">
+                            <label class="form-label">Costo Reposición (S/)</label>
+                            <input type="number" step="0.01" name="CostoReposicion" class="form-input" required>
+                        </div>
+                        <div style="flex:1">
+                            <label class="form-label">Stock Inicial</label>
+                            <input type="number" name="StockTotal" class="form-input" required min="1">
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">Guardar Usuario</button>
+                </div>
+                <button type="submit" class="btn btn-primary">Guardar Herramienta</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Merma Report Modal -->
+    <div id="merma-modal" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title">Reportar Daño / Auditoría</h3>
+                <button class="close-btn" onclick="closeModal('merma-modal')">&times;</button>
+            </div>
+            <form id="merma-form">
+                <input type="hidden" name="HerramientaId" id="merma-tool-id">
+                <div class="form-group">
+                    <label class="form-label">Herramienta</label>
+                    <input type="text" id="merma-tool-name" class="form-input" readonly style="background:#f1f5f9;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Cantidad Dañada</label>
+                    <input type="number" name="Cantidad" class="form-input" min="1" required>
+                    <small class="text-muted">Máximo disponible: <span id="merma-max-qty">0</span></small>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Motivo / Observación</label>
+                    <textarea name="Motivo" class="form-input" rows="3"
+                        placeholder="Ej. Roto durante operación en nave..." required></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="background:#ef4444;">Reportar Merma</button>
             </form>
         </div>
     </div>
