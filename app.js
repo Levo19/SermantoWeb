@@ -445,6 +445,29 @@ function switchFinanceTab(tabName) {
     if (tabName === 'income') btns[1].classList.add('active');
 }
 
+// Toast Notification
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    toast.textContent = message;
+    if (type === 'error') toast.style.backgroundColor = '#ef4444';
+    if (type === 'success') toast.style.backgroundColor = '#22c55e';
+
+    document.body.appendChild(toast);
+
+    // Animate In
+    requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+    });
+
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(20px)';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
 // Generic Modal Helpers
 function openModal(modalId) {
     document.getElementById(modalId).classList.remove('hidden');
