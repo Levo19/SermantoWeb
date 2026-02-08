@@ -594,10 +594,7 @@ document.getElementById('income-form').addEventListener('submit', async (e) => {
     }
 });
 
-// Service Modal & Logic
-function openServiceModal() {
-    openModal('service-modal');
-}
+// Service Modal & Logic refactored below with Edit support
 
 // Service Form Submit
 document.getElementById('service-form').addEventListener('submit', async (e) => {
@@ -884,46 +881,106 @@ async function loadServices(silent = false) {
 }
 
 function renderServices(data) {
-    const tbody = document.getElementById('services-list');
+    const grid = document.getElementById('services-list');
     if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center">No hay servicios registrados.</td></tr>';
+        grid.innerHTML = '<div class="text-center" style="grid-column: 1/-1;">No hay servicios registrados.</div>';
         return;
     }
 
-    tbody.innerHTML = data.map(item => {
+    grid.innerHTML = data.map(item => {
         const cost = parseFloat(item.CostoUnitario) || 0;
         const price = parseFloat(item.PrecioUnitario) || 0;
         const margin = price > 0 ? ((price - cost) / price * 100).toFixed(1) : 0;
         const currency = item.Moneda === 'USD' ? '$' : 'S/';
 
+        // Placeholder image if none user-provided
+        const imgUrl = item.FotoUrl || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=400';
+
         return `
-            <tr>
-                <td><strong>${item.Nombre}</strong></td>
-                <td><small>${item.Descripcion || '-'}</small></td>
-                <td><span class="badge">${item.UnidadMedida}</span></td>
-                <td>${currency} ${cost.toFixed(2)}</td>
-                <td>${currency} ${price.toFixed(2)}</td>
-                <td>
-                    <span class="badge ${margin > 30 ? 'success' : (margin > 15 ? 'warning' : 'danger')}">
-                        ${margin}%
-                    </span>
-                </td>
-                <td>
-                    ${item.FotoUrl ? `<a href="${item.FotoUrl}" target="_blank" class="action-btn"><i class="ph ph-image"></i></a>` : '-'}
-                </td>
-                <td>
-                     <button class="action-btn text-danger" onclick="deleteService('${item.id}')" title="Eliminar"><i class="ph ph-trash"></i></button>
-                </td>
-            </tr>
+            <div class="service-card" onclick="this.classList.toggle('flipped')">
+                <div class="card-inner">
+                    <!-- Front -->
+                    <div class="card-front">
+                        <img src="${imgUrl}" alt="${item.Nombre}" class="card-img">
+                        <div class="card-content">
+                            <div>
+                                <h3 class="card-title">${item.Nombre}</h3>
+                                <span class="badge ${margin > 30 ? 'success' : 'warning'}">Margen: ${margin}%</span>
+                            </div>
+                            <div class="card-price">
+                                ${currency} ${price.toFixed(2)} <span style="font-size:0.8rem; font-weight:400; color:#718096">/ ${item.UnidadMedida}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Back -->
+                    <div class="card-back">
+                        <h4>Detalles</h4>
+                        <p>${item.Descripcion || 'Sin descripción'}</p>
+                        
+                        <div class="data-row">
+                            <span>Cost. Unit:</span>
+                            <strong>${currency} ${cost.toFixed(2)}</strong>
+                        </div>
+                        <div class="data-row">
+                            <span>Precio:</span>
+                            <strong>${currency} ${price.toFixed(2)}</strong>
+                        </div>
+                        <div class="data-row">
+                            <span>Utilidad:</span>
+                            <strong>${currency} ${(price - cost).toFixed(2)}</strong>
+                        </div>
+
+                        <div class="card-actions">
+                            <button class="btn-icon-circle" onclick="event.stopPropagation(); editService('${item.id}')" title="Editar">
+                                <i class="ph ph-pencil-simple"></i>
+                            </button>
+                            <button class="btn-icon-circle" onclick="event.stopPropagation(); deleteService('${item.id}')" title="Eliminar" style="background:#ef4444;">
+                                <i class="ph ph-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         `;
     }).join('');
 }
 
+let editingServiceId = null;
+
+window.editService = function (id) {
+    const service = state.data.services.find(s => s.id === id);
+    if (!service) return;
+
+    editingServiceId = id;
+
+    // Fill Form
+    const f = document.getElementById('service-form');
+    f.querySelector('input[name="Nombre"]').value = service.Nombre;
+    f.querySelector('textarea[name="Descripcion"]').value = service.Descripcion;
+    f.querySelector('input[name="UnidadMedida"]').value = service.UnidadMedida;
+    f.querySelector('select[name="Moneda"]').value = service.Moneda;
+    f.querySelector('input[name="CostoUnitario"]').value = service.CostoUnitario;
+    f.querySelector('input[name="PrecioUnitario"]').value = service.PrecioUnitario;
+
+    // Update Modal UI
+    document.querySelector('#service-modal .modal-title').textContent = "Editar Servicio";
+    document.querySelector('#service-form button[type="submit"]').textContent = "Actualizar Servicio";
+
+    openModal('service-modal');
+};
+
+window.openServiceModal = function () {
+    editingServiceId = null;
+    document.getElementById('service-form').reset();
+    document.querySelector('#service-modal .modal-title').textContent = "Nuevo Servicio";
+    document.querySelector('#service-form button[type="submit"]').textContent = "Guardar Servicio";
+    openModal('service-modal');
+};
+
 window.deleteService = async function (id) {
     if (!confirm('¿Eliminar este servicio del catálogo?')) return;
 
-    // Optimistic Remove
-    // For now simple reload pattern
     try {
         const response = await fetch(API_URL, {
             method: 'POST',
