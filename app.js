@@ -1189,45 +1189,111 @@ function renderMermas(data) {
 // Actions
 
 // CREATE TOOL
+// CREATE TOOL (Optimistic)
 document.getElementById('tool-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const btn = e.target.querySelector('button');
-    btn.disabled = true;
-
     const formData = new FormData(e.target);
+    if (!formData.get('Nombre') || !formData.get('StockTotal')) return;
+
+    // 1. Optimistic Render
     const payload = Object.fromEntries(formData.entries());
-    // Initial Available = Total
     payload.StockDisponible = payload.StockTotal;
 
+    // Temp ID
+    const tempId = 'temp-' + Date.now();
+    const optimisticTool = {
+        id: tempId,
+        ...payload,
+        CostoReposicion: parseFloat(payload.CostoReposicion),
+        StockTotal: parseInt(payload.StockTotal),
+        StockDisponible: parseInt(payload.StockDisponible),
+        FotoUrl: ''
+    };
+
+    state.data.tools = state.data.tools || [];
+    state.data.tools.push(optimisticTool);
+    renderTools(state.data.tools);
+
+    closeModal('tool-modal');
+    e.target.reset();
+
+    // Toast
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    toast.textContent = 'Guardando herramienta...';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+
+    // 2. Background Sync
     try {
+        const fileInput = document.getElementById('tool-file-input');
+        const file = fileInput.files[0];
+        let fileUrl = '';
+
+        if (file) {
+            const base64 = await toBase64(file);
+            const uploadResp = await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'uploadFile',
+                    module: 'inventory',
+                    fileName: 'TOOL-' + file.name,
+                    mimeType: file.type,
+                    fileBase64: base64
+                })
+            });
+            const result = await uploadResp.json();
+            if (result.status === 'success') fileUrl = result.fileUrl;
+        }
+
+        payload.FotoUrl = fileUrl;
+
         const response = await fetch(API_URL, {
             method: 'POST',
             body: JSON.stringify({ action: 'db', op: 'create', table: 'Herramientas', userRole: state.user.role, payload: payload })
         });
         const res = await response.json();
+
         if (res.status === 'success') {
-            alert('Herramienta registrada');
-            closeModal('tool-modal');
-            e.target.reset();
-            loadTools();
+            loadTools(true); // Silent reload to get real ID
         } else {
-            alert(res.message);
+            console.error('Error:', res.message);
+            // Revert on error
+            state.data.tools = state.data.tools.filter(t => t.id !== tempId);
+            renderTools(state.data.tools);
+            alert('Error al guardar: ' + res.message);
         }
-    } catch (e) { alert('Error conexión'); }
-    finally { btn.disabled = false; }
+    } catch (e) {
+        console.error(e);
+        state.data.tools = state.data.tools.filter(t => t.id !== tempId);
+        renderTools(state.data.tools);
+        alert('Error de conexión.');
+    }
 });
 
 // REPORT MERMA
+// REPORT MERMA (Optimistic)
 document.getElementById('merma-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const btn = e.target.querySelector('button');
-    btn.disabled = true;
-
     const formData = new FormData(e.target);
     const toolId = formData.get('HerramientaId');
-    const qty = parseInt(formData.get('Cantidad'));
+    const systemStock = parseInt(document.getElementById('merma-system-stock').value);
+    const physicalCount = parseInt(document.getElementById('merma-physical-count').value);
+    const diff = physicalCount - systemStock;
+    const qty = Math.abs(diff);
 
-    // 1. Create Merma Record
+    if (diff === 0) {
+        closeModal('merma-modal');
+        return;
+    }
+
+    // 1. Optimistic Update
+    const toolIndex = state.data.tools.findIndex(t => t.id === toolId);
+    if (toolIndex !== -1) {
+        state.data.tools[toolIndex].StockDisponible = physicalCount;
+        renderTools(state.data.tools);
+    }
+
     const mermaPayload = {
         HerramientaId: toolId,
         Cantidad: qty,
@@ -1236,80 +1302,132 @@ document.getElementById('merma-form').addEventListener('submit', async (e) => {
         FechaReporte: new Date().toISOString()
     };
 
-    // 2. Update Tool Stock (Decrease Available)
-    const tool = state.data.tools.find(t => t.id === toolId);
-    if (!tool) return;
+    if (diff < 0) {
+        state.data.mermas = state.data.mermas || [];
+        state.data.mermas.push({ id: 'temp-' + Date.now(), ...mermaPayload });
+        renderMermas(state.data.mermas);
+    }
 
-    const newAvailable = parseInt(tool.StockDisponible || tool.StockTotal) - qty;
+    closeModal('merma-modal');
+    e.target.reset();
 
+    // 2. Background Sync
     try {
-        // Create Merma
-        await fetch(API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'db', op: 'create', table: 'Mermas', userRole: state.user.role, payload: mermaPayload })
-        });
-
-        // Update Tool
-        await fetch(API_URL, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: 'db', op: 'update', table: 'Herramientas', userRole: state.user.role,
-                payload: { id: toolId, StockDisponible: newAvailable }
-            })
-        });
-
-        alert('Merma reportada exitosamente');
-        closeModal('merma-modal');
-        e.target.reset();
-
-        // Refresh
-        loadTools();
+        if (diff < 0) {
+            // Deficit
+            await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'db', op: 'create', table: 'Mermas', userRole: state.user.role, payload: mermaPayload })
+            });
+            await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'db', op: 'update', table: 'Herramientas', userRole: state.user.role, payload: { id: toolId, StockDisponible: physicalCount } })
+            });
+        } else {
+            // Surplus
+            await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'db', op: 'update', table: 'Herramientas', userRole: state.user.role, payload: { id: toolId, StockDisponible: physicalCount } })
+            });
+        }
+        loadTools(true);
+        loadMermas(true);
+    } catch (e) {
+        console.error(e);
+        loadTools(); // Revert
         loadMermas();
-
-    } catch (e) { alert('Error conexión'); }
-    finally { btn.disabled = false; }
+        alert('Error de sincronización.');
+    }
 });
 
 // RESOLVE MERMA
-window.resolveMerma = async function (mermaId, action, toolId, qty) {
-    if (!confirm(`¿Confirmar acción: ${action}?`)) return;
+// RESOLVE MERMA (Optimistic)
+window.resolveMerma = async function (mermaId, action, toolId, totalQty) {
+    let qtyToProcess = totalQty;
 
+    if (action === 'Recuperar') {
+        const input = prompt(`Cantidad a recuperar (Máximo: ${totalQty}):`, totalQty);
+        if (input === null) return;
+        qtyToProcess = parseInt(input);
+        if (isNaN(qtyToProcess) || qtyToProcess <= 0 || qtyToProcess > totalQty) {
+            alert("Cantidad inválida.");
+            return;
+        }
+    } else {
+        if (!confirm(`¿Confirmar Dar de Baja a ${totalQty} items?`)) return;
+    }
+
+    // 1. Optimistic Update
+    const mermaIndex = state.data.mermas.findIndex(m => m.id === mermaId);
+    if (mermaIndex !== -1) {
+        state.data.mermas[mermaIndex].Estado = action === 'Recuperar' ? 'Recuperado' : 'Baja';
+    }
+    renderMermas(state.data.mermas);
+
+    const toolIndex = state.data.tools.findIndex(t => t.id === toolId);
+    if (toolIndex !== -1 && action === 'Recuperar') {
+        state.data.tools[toolIndex].StockDisponible = parseInt(state.data.tools[toolIndex].StockDisponible) + qtyToProcess;
+        renderTools(state.data.tools);
+    } else if (toolIndex !== -1) {
+        state.data.tools[toolIndex].StockTotal = parseInt(state.data.tools[toolIndex].StockTotal) - qtyToProcess;
+        renderTools(state.data.tools);
+    }
+
+    // 2. Background Sync
     try {
-        // 1. Update Merma Status
+        const remainingQty = totalQty - qtyToProcess;
+        const newStatus = action === 'Recuperar' ? 'Recuperado' : 'Baja';
+
         await fetch(API_URL, {
             method: 'POST',
             body: JSON.stringify({
                 action: 'db', op: 'update', table: 'Mermas', userRole: state.user.role,
-                payload: { id: mermaId, Estado: action === 'Recuperar' ? 'Recuperado' : 'Baja' }
+                payload: { id: mermaId, Estado: newStatus, Cantidad: qtyToProcess }
             })
         });
 
-        // 2. If 'Recuperar', Return to Stock. If 'Baja', Reduce Total Stock.
-        const tool = state.data.tools.find(t => t.id === toolId);
-        if (tool) {
-            let updatePayload = { id: toolId };
-            let currentAvailable = parseInt(tool.StockDisponible || 0);
-            let currentTotal = parseInt(tool.StockTotal || 0);
-
-            if (action === 'Recuperar') {
-                updatePayload.StockDisponible = currentAvailable + parseInt(qty);
-            } else {
-                // Baja: Available stays same (it was already removed), but Total decreases
-                updatePayload.StockTotal = currentTotal - parseInt(qty);
-            }
-
+        if (remainingQty > 0) {
             await fetch(API_URL, {
                 method: 'POST',
                 body: JSON.stringify({
-                    action: 'db', op: 'update', table: 'Herramientas', userRole: state.user.role,
-                    payload: updatePayload
+                    action: 'db', op: 'create', table: 'Mermas', userRole: state.user.role,
+                    payload: {
+                        HerramientaId: toolId,
+                        Cantidad: remainingQty,
+                        Motivo: 'Remanente de merma parcial',
+                        Estado: 'En Revision',
+                        FechaReporte: new Date().toISOString()
+                    }
                 })
             });
         }
 
-        alert('Acción registrada');
+        const tool = state.data.tools.find(t => t.id === toolId);
+        if (action === 'Recuperar') {
+            await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'db', op: 'update', table: 'Herramientas', userRole: state.user.role,
+                    payload: { id: toolId, StockDisponible: tool.StockDisponible }
+                })
+            });
+        } else {
+            await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'db', op: 'update', table: 'Herramientas', userRole: state.user.role,
+                    payload: { id: toolId, StockTotal: tool.StockTotal }
+                })
+            });
+        }
+
+        loadTools(true);
+        loadMermas(true);
+
+    } catch (e) {
+        console.error(e);
         loadTools();
         loadMermas();
-
-    } catch (e) { alert('Error conexión'); }
+        alert('Error de sincronización.');
+    }
 };
