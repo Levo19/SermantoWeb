@@ -612,6 +612,7 @@ document.getElementById('income-form').addEventListener('submit', async (e) => {
 // Service Modal & Logic refactored below with Edit support
 
 // Service Form Submit
+// Service Form Submit
 document.getElementById('service-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
@@ -623,10 +624,6 @@ document.getElementById('service-form').addEventListener('submit', async (e) => 
     const fileInput = document.getElementById('service-file-input');
     const file = fileInput.files[0];
 
-    // Optimistic UI
-    // (We could implement optimistic rendering here like expenses if desired, 
-    // but for catalog items, a small wait is usually acceptable. Let's do simple wait for now)
-
     try {
         let fileUrl = '';
 
@@ -636,7 +633,8 @@ document.getElementById('service-form').addEventListener('submit', async (e) => 
             const uploadResp = await fetch(API_URL, {
                 method: 'POST',
                 body: JSON.stringify({
-                    action: 'uploadInvoice', // Reusing upload logic (stores in Finance folder, maybe we should change folder but ok for now)
+                    action: 'uploadFile',
+                    module: 'services',
                     fileName: 'SVC-' + file.name,
                     mimeType: file.type,
                     fileBase64: base64
@@ -648,15 +646,22 @@ document.getElementById('service-form').addEventListener('submit', async (e) => 
             }
         }
 
-        // 2. Save to DB
+        // 2. Prepare Payload
         const payload = Object.fromEntries(formData.entries());
-        payload.FotoUrl = fileUrl;
+        if (fileUrl) payload.FotoUrl = fileUrl;
+
+        // Determine Action: Create or Update
+        let op = 'create';
+        if (editingServiceId) {
+            op = 'update';
+            payload.id = editingServiceId;
+        }
 
         const response = await fetch(API_URL, {
             method: 'POST',
             body: JSON.stringify({
                 action: 'db',
-                op: 'create',
+                op: op,
                 table: 'Servicios',
                 userRole: state.user.role,
                 payload: payload
@@ -666,9 +671,10 @@ document.getElementById('service-form').addEventListener('submit', async (e) => 
         const res = await response.json();
 
         if (res.status === 'success') {
-            alert('Servicio creado correctamente');
+            alert(editingServiceId ? 'Servicio actualizado' : 'Servicio creado');
             closeModal('service-modal');
             e.target.reset();
+            editingServiceId = null; // Reset edit mode
             loadServices(false); // Force refresh
         } else {
             alert('Error: ' + res.message);
