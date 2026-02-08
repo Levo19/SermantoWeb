@@ -901,6 +901,31 @@ async function loadServices(silent = false) {
     }
 }
 
+
+function formatDriveImage(url) {
+    if (!url) return null;
+    try {
+        // Handle common Drive Viewer links
+        // Pattern 1: https://drive.google.com/file/d/FILE_ID/view...
+        // Pattern 2: https://drive.google.com/open?id=FILE_ID
+        // Pattern 3: https://drive.google.com/uc?export=view&id=FILE_ID (Keep as is, but ensuring)
+
+        let fileId = null;
+        if (url.includes('/file/d/')) {
+            const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+            if (match) fileId = match[1];
+        } else if (url.includes('id=')) {
+            const match = url.match(/id=([a-zA-Z0-9_-]+)/);
+            if (match) fileId = match[1];
+        }
+
+        if (fileId) {
+            return `https://drive.google.com/uc?export=view&id=${fileId}`;
+        }
+    } catch (e) { console.error('Error parsing Image URL', e); }
+    return url;
+}
+
 function renderServices(data) {
     const grid = document.getElementById('services-list');
     if (!data || data.length === 0) {
@@ -915,11 +940,11 @@ function renderServices(data) {
         const currency = item.Moneda === 'USD' ? '$' : 'S/';
 
         // Default Image Logic
-        let imgUrl = item.FotoUrl;
-        if (!imgUrl || imgUrl.trim() === '') {
+        let displayUrl = formatDriveImage(item.FotoUrl);
+        if (!displayUrl || displayUrl.trim() === '') {
             // Using UI Avatars for a clean default if no image
             const name = encodeURIComponent(item.Nombre.substring(0, 20));
-            imgUrl = `https://ui-avatars.com/api/?name=${name}&background=0a192f&color=64ffda&size=400&font-size=0.33&length=2`;
+            displayUrl = `https://ui-avatars.com/api/?name=${name}&background=0a192f&color=64ffda&size=400&font-size=0.33&length=2`;
         }
 
         return `
@@ -927,7 +952,9 @@ function renderServices(data) {
                 <div class="card-inner">
                     <!-- Front -->
                     <div class="card-front">
-                        <img src="${imgUrl}" alt="${item.Nombre}" class="card-img">
+                        <div class="card-img-container" style="width:100%; height:180px; overflow:hidden; background:#f0f0f0; display:flex; align-items:center; justify-content:center;">
+                             <img src="${displayUrl}" alt="${item.Nombre}" class="card-img" style="width:100%; height:100%; object-fit:cover;" referrerpolicy="no-referrer" loading="lazy" onerror="this.src='https://placehold.co/400x300?text=No+Image'">
+                        </div>
                         <div class="card-content">
                             <div>
                                 <h3 class="card-title">${item.Nombre}</h3>
@@ -1116,20 +1143,25 @@ function renderTools(data) {
         if (available === 0) statusBadge = '<span class="badge danger">Agotado</span>';
         else if (available < total * 0.3) statusBadge = '<span class="badge warning">Bajo Stock</span>';
 
+        // Image Logic
+        let displayUrl = formatDriveImage(item.FotoUrl);
+        const imgTag = displayUrl
+            ? `<a href="${displayUrl}" target="_blank"><img src="${displayUrl}" style="width:40px; height:40px; object-fit:cover; border-radius:4px;" referrerpolicy="no-referrer"></a>`
+            : '<span class="text-muted">-</span>';
+
         return `
             <tr>
                 <td><strong>${item.Nombre}</strong></td>
+                <td class="text-center">${imgTag}</td>
                 <td>${item.Descripcion || '-'}</td>
                 <td>S/ ${parseFloat(item.CostoReposicion || 0).toFixed(2)}</td>
                 <td class="text-muted">${total}</td>
                 <td style="font-weight:bold; color:${available > 0 ? '#10b981' : '#ef4444'}">${available}</td>
                 <td>${statusBadge}</td>
                 <td>
-                    ${available > 0 ?
-                `<button class="action-btn" title="Reportar Merma/Daño" onclick="openMermaModal('${item.id}', '${item.Nombre}', ${available})">
-                            <i class="ph ph-warning-circle text-danger"></i>
-                        </button>`
-                : '-'}
+                    <button class="action-btn" title="Realizar Auditoría" onclick="openMermaModal('${item.id}', '${item.Nombre}', ${available})">
+                        <i class="ph ph-clipboard-text text-primary"></i>
+                    </button>
                 </td>
             </tr>
         `;
