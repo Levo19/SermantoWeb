@@ -905,19 +905,24 @@ async function loadServices(silent = false) {
 function formatDriveImage(url) {
     if (!url) return null;
     try {
-        // Handle common Drive Viewer links
         let fileId = null;
-        if (url.includes('/file/d/')) {
+        // Case 1: Raw ID (long alphanumeric)
+        if (/^[a-zA-Z0-9_-]{20,}$/.test(url)) {
+            fileId = url;
+        }
+        // Case 2: Standard View/Share URLs
+        else if (url.includes('/file/d/')) {
             const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
             if (match) fileId = match[1];
-        } else if (url.includes('id=')) {
+        }
+        // Case 3: Export/Open URLs
+        else if (url.includes('id=')) {
             const match = url.match(/id=([a-zA-Z0-9_-]+)/);
             if (match) fileId = match[1];
         }
 
         if (fileId) {
-            // "thumbnail" endpoint is often more reliable for embedding than "uc?export=view"
-            // sz=w800 requests a width of 800px
+            // Using 'thumbnail' endpoint for reliable public viewing without redirect issues
             return `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`;
         }
     } catch (e) { console.error('Error parsing Image URL', e); }
@@ -1194,6 +1199,9 @@ function renderTools(data) {
                              <button class="btn-icon-circle" title="Realizar Auditoría" onclick="event.stopPropagation(); openMermaModal('${item.id}', '${item.Nombre}', ${available})">
                                 <i class="ph ph-clipboard-text"></i>
                             </button>
+                             <button class="btn-icon-circle" title="Ver Historial" onclick="event.stopPropagation(); openHistoryModal('${item.id}', '${item.Nombre}')">
+                                <i class="ph ph-clock-counter-clockwise"></i>
+                            </button>
                              <!-- Add Edit/Delete actions here if needed later -->
                         </div>
                     </div>
@@ -1451,8 +1459,12 @@ document.getElementById('tool-form').addEventListener('submit', async (e) => {
 });
 
 // History Logic
-window.openHistoryModal = async function () {
+window.openHistoryModal = async function (toolId, toolName) {
     const tbody = document.getElementById('history-list');
+    const title = document.querySelector('#history-modal .modal-title');
+    if (toolName) title.textContent = `Historial: ${toolName}`;
+    else title.textContent = 'Historial Global';
+
     tbody.innerHTML = '<tr><td colspan="6" class="text-center">Cargando historial...</td></tr>';
     openModal('history-modal');
 
@@ -1463,8 +1475,9 @@ window.openHistoryModal = async function () {
         });
         const res = await response.json();
         if (res.status === 'success' && res.data) {
-            // Sort by Date Descending
-            const sorted = res.data.sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+            let sorted = res.data;
+            if (toolId) sorted = sorted.filter(item => String(item.HerramientaId) === String(toolId));
+            sorted.sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
 
             if (sorted.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" class="text-center">No hay movimientos registrados.</td></tr>';
