@@ -893,8 +893,13 @@ function renderServices(data) {
         const margin = price > 0 ? ((price - cost) / price * 100).toFixed(1) : 0;
         const currency = item.Moneda === 'USD' ? '$' : 'S/';
 
-        // Placeholder image if none user-provided
-        const imgUrl = item.FotoUrl || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=400';
+        // Default Image Logic
+        let imgUrl = item.FotoUrl;
+        if (!imgUrl || imgUrl.trim() === '') {
+            // Using UI Avatars for a clean default if no image
+            const name = encodeURIComponent(item.Nombre.substring(0, 20));
+            imgUrl = `https://ui-avatars.com/api/?name=${name}&background=0a192f&color=64ffda&size=400&font-size=0.33&length=2`;
+        }
 
         return `
             <div class="service-card" onclick="this.classList.toggle('flipped')">
