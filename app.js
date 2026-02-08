@@ -906,10 +906,6 @@ function formatDriveImage(url) {
     if (!url) return null;
     try {
         // Handle common Drive Viewer links
-        // Pattern 1: https://drive.google.com/file/d/FILE_ID/view...
-        // Pattern 2: https://drive.google.com/open?id=FILE_ID
-        // Pattern 3: https://drive.google.com/uc?export=view&id=FILE_ID (Keep as is, but ensuring)
-
         let fileId = null;
         if (url.includes('/file/d/')) {
             const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
@@ -920,7 +916,9 @@ function formatDriveImage(url) {
         }
 
         if (fileId) {
-            return `https://drive.google.com/uc?export=view&id=${fileId}`;
+            // "thumbnail" endpoint is often more reliable for embedding than "uc?export=view"
+            // sz=w800 requests a width of 800px
+            return `https://drive.google.com/thumbnail?id=${fileId}&sz=w800`;
         }
     } catch (e) { console.error('Error parsing Image URL', e); }
     return url;
