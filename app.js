@@ -1911,17 +1911,28 @@ function renderOpExpenses(opId) {
 
 
 // Populate Service Select when opening Modal
-const _origOpenOpModal = openOperationModal;
-openOperationModal = function () {
-    _origOpenOpModal();
+// Populate Service Select when opening Modal
+function openOperationModal() {
+    document.getElementById('operation-modal').classList.remove('hidden');
+
     const select = document.getElementById('op-service-select');
+    if (!select) return;
+
     if (state.data.services) {
         select.innerHTML = state.data.services.map(s => `<option value="${s.Nombre}">${s.Nombre}</option>`).join('');
     } else {
         select.innerHTML = '<option>Cargando servicios...</option>';
-        loadServices().then(() => openOperationModal()); // Retry
+        loadServices().then(() => {
+            // Update if still open
+            if (!document.getElementById('operation-modal').classList.contains('hidden')) {
+                const s = document.getElementById('op-service-select');
+                if (s && state.data.services) {
+                    s.innerHTML = state.data.services.map(o => `<option value="${o.Nombre}">${o.Nombre}</option>`).join('');
+                }
+            }
+        });
     }
-};
+}
 
 // --- Personnel Module Logic ---
 
