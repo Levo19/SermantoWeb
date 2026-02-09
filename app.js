@@ -1912,25 +1912,45 @@ function renderOpExpenses(opId) {
 
 // Populate Service Select when opening Modal
 // Populate Service Select when opening Modal
+// Populate Service Select when opening Modal
 function openOperationModal() {
     document.getElementById('operation-modal').classList.remove('hidden');
 
+    // 1. Services
     const select = document.getElementById('op-service-select');
-    if (!select) return;
-
-    if (state.data.services) {
-        select.innerHTML = state.data.services.map(s => `<option value="${s.Nombre}">${s.Nombre}</option>`).join('');
-    } else {
-        select.innerHTML = '<option>Cargando servicios...</option>';
-        loadServices().then(() => {
-            // Update if still open
-            if (!document.getElementById('operation-modal').classList.contains('hidden')) {
-                const s = document.getElementById('op-service-select');
-                if (s && state.data.services) {
-                    s.innerHTML = state.data.services.map(o => `<option value="${o.Nombre}">${o.Nombre}</option>`).join('');
+    if (select) {
+        if (state.data.services) {
+            select.innerHTML = state.data.services.map(s => `<option value="${s.Nombre}">${s.Nombre}</option>`).join('');
+        } else {
+            select.innerHTML = '<option>Cargando servicios...</option>';
+            loadServices().then(() => {
+                if (!document.getElementById('operation-modal').classList.contains('hidden')) {
+                    const s = document.getElementById('op-service-select');
+                    if (s && state.data.services) {
+                        s.innerHTML = state.data.services.map(o => `<option value="${o.Nombre}">${o.Nombre}</option>`).join('');
+                    }
                 }
-            }
-        });
+            });
+        }
+    }
+
+    // 2. Supervisors
+    const supSelect = document.getElementById('op-supervisor-select');
+    if (supSelect) {
+        // Ensure personnel is loaded
+        if (!state.data.personnel) {
+            supSelect.innerHTML = '<option>Cargando...</option>';
+            loadPersonnel(true).then(() => openOperationModal());
+            return;
+        }
+
+        const supervisors = (state.data.personnel || []).filter(p => p.RolDefault === 'Supervisor' || p.RolDefault === 'Jefe de Riesgos');
+
+        if (supervisors.length > 0) {
+            supSelect.innerHTML = supervisors.map(s => `<option value="${s.Nombres} ${s.Apellidos}|${s.id}">${s.Nombres} ${s.Apellidos}</option>`).join('');
+        } else {
+            supSelect.innerHTML = '<option value="">No hay supervisores registrados</option>';
+        }
     }
 }
 
@@ -2237,15 +2257,24 @@ document.getElementById('liquidation-form').addEventListener('submit', async (e)
 
 document.getElementById('operation-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const btn = e.target.querySelector('button');
+    const btn = e.target.querySelector('button[type="submit"]');
     btn.disabled = true;
     btn.innerText = "Creando...";
 
     const formData = new FormData(e.target);
     const payload = Object.fromEntries(formData.entries());
 
+    // Handle Supervisor Split "Name|ID"
+    let supervisorId = null;
+    if (payload.Supervisor && payload.Supervisor.includes('|')) {
+        const parts = payload.Supervisor.split('|');
+        payload.Supervisor = parts[0]; // Validation Name
+        supervisorId = parts[1];
+    }
+
     try {
-        const response = await fetch(API_URL, {
+        // 1. Create Operation
+        const resp = await fetch(API_URL, {
             method: 'POST',
             body: JSON.stringify({
                 action: 'db',
@@ -2255,18 +2284,41 @@ document.getElementById('operation-form').addEventListener('submit', async (e) =
                 payload: payload
             })
         });
-        const res = await response.json();
+        const res = await resp.json();
+
         if (res.status === 'success') {
-            alert('Operación creada: ' + res.generatedCode);
+            const opId = res.id;
+
+            // 2. Auto-Assign Supervisor
+            if (supervisorId) {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'db',
+                        op: 'create',
+                        table: 'Operacion_Personal',
+                        userRole: state.user.role,
+                        payload: {
+                            operationId: opId,
+                            personalId: supervisorId,
+                            RolAsignado: 'Supervisor',
+                            HoraIngreso: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            Estado: 'Activo'
+                        }
+                    })
+                });
+            }
+
+            alert('Operación creada correctamente');
             closeModal('operation-modal');
             e.target.reset();
             loadOperations();
         } else {
             alert(res.message);
         }
-    } catch (err) {
-        console.error(err);
-        alert('Error de conexión');
+    } catch (e) {
+        console.error(e);
+        alert('Error al crear operación');
     } finally {
         btn.disabled = false;
         btn.innerText = "Crear Operación";
