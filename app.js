@@ -14,7 +14,8 @@ const state = {
         services: null,
         tools: null,
         mermas: null,
-        operations: null
+        operations: null,
+        personnel: null
     },
     lastUpdated: {
         expenses: null,
@@ -22,7 +23,8 @@ const state = {
         services: null,
         tools: null,
         mermas: null,
-        operations: null
+        operations: null,
+        personnel: null
     },
     activeOperation: null, // Stores the full object of currently viewed op
     intervals: []
@@ -1874,6 +1876,18 @@ function viewOperation(id) {
     renderOpExpenses(op.id);
 
     switchView('operation-details-view');
+    if (tab === 'overview') buttons[0].classList.add('active');
+    if (tab === 'personnel') buttons[1].classList.add('active');
+    if (tab === 'expenses') buttons[2].classList.add('active');
+
+    document.getElementById(`tab-op-${tab}`).classList.remove('hidden');
+
+    if (tab === 'expenses' && state.activeOperation) {
+        renderOpExpenses(state.activeOperation.id);
+    }
+    if (tab === 'personnel' && state.activeOperation) {
+        loadOpPersonnel(state.activeOperation.id);
+    }
 }
 
 function renderOpExpenses(opId) {
@@ -1895,9 +1909,251 @@ function renderOpExpenses(opId) {
     `).join('');
 }
 
-function openOperationModal() {
-    document.getElementById('operation-modal').classList.remove('hidden');
+
+// Populate Service Select when opening Modal
+const _origOpenOpModal = openOperationModal;
+openOperationModal = function () {
+    _origOpenOpModal();
+    const select = document.getElementById('op-service-select');
+    if (state.data.services) {
+        select.innerHTML = state.data.services.map(s => `<option value="${s.Nombre}">${s.Nombre}</option>`).join('');
+    } else {
+        select.innerHTML = '<option>Cargando servicios...</option>';
+        loadServices().then(() => openOperationModal()); // Retry
+    }
+};
+
+// --- Personnel Module Logic ---
+
+async function loadPersonnel(silent = false) {
+    const tbody = document.getElementById('personnel-list'); // Table body
+    if (!silent && state.data.personnel) {
+        renderPersonnel(state.data.personnel);
+    } else if (!silent && tbody) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">Cargando personal...</td></tr>';
+    }
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'read',
+                table: 'Personal',
+                userRole: state.user.role
+            })
+        });
+        const res = await response.json();
+        if (res.status === 'success') {
+            state.data.personnel = res.data;
+            if (tbody) renderPersonnel(res.data);
+        } else {
+            if (tbody && !silent) tbody.innerHTML = '<tr><td colspan="6" class="text-center">No hay personal registrado.</td></tr>';
+        }
+    } catch (e) {
+        console.error(e);
+    }
 }
+
+function renderPersonnel(data) {
+    const tbody = document.getElementById('personnel-list');
+    if (!tbody) return;
+
+    if (!data || data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No hay personal registrado.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = data.map(p => `
+        <tr>
+            <td>
+                <strong>${p.Nombres} ${p.Apellidos || ''}</strong><br>
+                <small class="text-muted">${p.DNI || '-'}</small>
+            </td>
+            <td>${p.RolDefault || 'Operador'}</td>
+            <td>${p.Telefono || '-'}</td>
+            <td>
+                ${p.CertificadoUrl ? `<a href="${p.CertificadoUrl}" target="_blank" class="badge">PDF</a>` : '<span class="text-muted">-</span>'}
+            </td>
+            <td>
+                 <span class="badge ${p.Estado === 'Apto' ? 'success' : 'danger'}">${p.Estado || 'Apto'}</span>
+            </td>
+            <td>
+                <button class="action-btn" onclick="editPersonnel('${p.id}')"><i class="ph ph-pencil"></i></button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function openPersonnelModal() {
+    document.getElementById('personnel-modal').classList.remove('hidden');
+}
+
+// Personnel Form Submit
+document.getElementById('personnel-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.innerText = "Guardando...";
+
+    const formData = new FormData(e.target);
+    const fileInput = document.getElementById('personnel-file-input');
+    const file = fileInput.files[0];
+
+    try {
+        let fileUrl = '';
+        if (file) {
+            const base64 = await toBase64(file);
+            const uploadResp = await fetch(API_URL, {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'uploadFile', // Reuse generic upload
+                    module: 'finances', // Using finances bucket for now
+                    fileName: 'DOC-' + file.name,
+                    mimeType: file.type,
+                    fileBase64: base64
+                })
+            });
+            const res = await uploadResp.json();
+            if (res.status === 'success') fileUrl = res.fileUrl;
+        }
+
+        const payload = Object.fromEntries(formData.entries());
+        if (fileUrl) payload.CertificadoUrl = fileUrl;
+
+        // Checkboxes to Boolean
+        payload.IncluyeViaticos = payload.IncluyeViaticos === 'on';
+        payload.IncluyeTraslado = payload.IncluyeTraslado === 'on';
+
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'create', // TODO: Handle Edit/Update
+                table: 'Personal',
+                userRole: state.user.role,
+                payload: payload
+            })
+        });
+
+        const res = await response.json();
+        if (res.status === 'success') {
+            alert('Personal registrado');
+            closeModal('personnel-modal');
+            e.target.reset();
+            loadPersonnel();
+        } else {
+            alert(res.message);
+        }
+
+    } catch (e) {
+        console.error(e);
+        alert('Error al guardar');
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Guardar Personal";
+    }
+});
+
+// --- Operation Personnel Assignment Logic ---
+
+function openAssignModal() {
+    document.getElementById('assign-modal').classList.remove('hidden');
+
+    // Populate Select
+    const select = document.getElementById('assign-personnel-select');
+    // Filter only Aptos
+    const aptos = (state.data.personnel || []).filter(p => p.Estado === 'Apto');
+    select.innerHTML = aptos.map(p => `<option value="${p.id}">${p.Nombres} ${p.Apellidos} (${p.RolDefault})</option>`).join('');
+}
+
+document.getElementById('assign-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!state.activeOperation) return;
+
+    const formData = new FormData(e.target);
+    const payload = Object.fromEntries(formData.entries());
+
+    // Add Link Data
+    payload.operationId = state.activeOperation.id;
+    // Find Personnel Data to Snapshot roles? Or just link ID
+    // We link ID.
+
+    try {
+        await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'create',
+                table: 'Operacion_Personal',
+                userRole: state.user.role,
+                payload: payload
+            })
+        });
+        alert('Personal agregado a la operación');
+        closeModal('assign-modal');
+        loadOpPersonnel(state.activeOperation.id);
+    } catch (e) {
+        alert('Error al asignar');
+    }
+});
+
+async function loadOpPersonnel(opId) {
+    const tbody = document.getElementById('op-personnel-list');
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center">Cargando equipo...</td></tr>';
+
+    try {
+        // This requires a join or a smart read.
+        // For now, we read all `Operacion_Personal` and filter.
+        // In production, backend should filter.
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'read',
+                table: 'Operacion_Personal',
+                userRole: state.user.role
+            })
+        });
+        const res = await response.json();
+        if (res.status === 'success') {
+            const opTeam = res.data.filter(Link => Link.operationId === opId);
+            renderOpPersonnel(opTeam);
+        } else {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nadie asignado aún.</td></tr>';
+        }
+
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function renderOpPersonnel(links) {
+    const tbody = document.getElementById('op-personnel-list');
+    if (links.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nadie asignado aún.</td></tr>';
+        return;
+    }
+
+    // Enrich with Personal Data
+    const fullList = links.map(link => {
+        const p = (state.data.personnel || []).find(x => x.id === link.personalId);
+        return { link, personnel: p || { Nombres: 'Desconocido', Apellidos: '' } };
+    });
+
+    tbody.innerHTML = fullList.map(item => `
+        <tr>
+            <td>${item.personnel.Nombres} ${item.personnel.Apellidos}</td>
+            <td>${item.personnel.RolDefault || '-'}</td>
+            <td>${item.link.HoraIngreso || '-'}</td>
+            <td>
+                <span class="badge success">Presente</span>
+            </td>
+            <td>-</td>
+        </tr>
+    `).join('');
+}
+
 
 document.getElementById('operation-form').addEventListener('submit', async (e) => {
     e.preventDefault();
