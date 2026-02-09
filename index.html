@@ -959,6 +959,62 @@
         </div>
     </div>
 
+    <!-- Liquidation Modal -->
+    <div id="liquidation-modal" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title">Liquidar Personal</h3>
+                <button class="close-btn" onclick="closeModal('liquidation-modal')">&times;</button>
+            </div>
+            <form id="liquidation-form">
+                <div class="form-group">
+                    <label class="form-label">Personal</label>
+                    <input type="text" id="liq-name" class="form-input" readonly style="background:#f1f5f9;">
+                    <input type="hidden" name="linkId" id="liq-link-id">
+                    <input type="hidden" id="liq-daily-rate">
+                </div>
+                <div class="form-group">
+                    <div class="row" style="display:flex; gap:1rem;">
+                        <div style="flex:1">
+                            <label class="form-label">Jornal Diario (Ref)</label>
+                            <input type="text" id="liq-rate-display" class="form-input" readonly
+                                style="background:#f1f5f9;">
+                        </div>
+                        <div style="flex:1">
+                            <label class="form-label">Días Trabajados</label>
+                            <input type="number" name="DiasTrabajados" id="liq-days" class="form-input" value="1"
+                                min="0" step="0.5" oninput="calculateLiquidationTotal()">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="row" style="display:flex; gap:1rem;">
+                        <div style="flex:1">
+                            <label class="form-label">Bonos / Extras</label>
+                            <input type="number" name="Bonos" id="liq-bonus" class="form-input" value="0" step="10"
+                                oninput="calculateLiquidationTotal()">
+                        </div>
+                        <div style="flex:1">
+                            <label class="form-label">Descuentos</label>
+                            <input type="number" name="Descuentos" id="liq-discount" class="form-input" value="0"
+                                step="10" oninput="calculateLiquidationTotal()">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Total a Pagar</label>
+                    <input type="text" name="CostoFinal" id="liq-total" class="form-input" readonly
+                        style="font-weight:bold; font-size:1.2rem; color:var(--primary);">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Observaciones</label>
+                    <textarea name="Observaciones" class="form-input" rows="2"></textarea>
+                </div>
+                <button type="submit" class="btn btn-success">Confirmar y Liquidar</button>
+            </form>
+        </div>
+    </div>
+
     <!-- Logic -->
     <script src="app.js?v=2"></script>
 </body>
