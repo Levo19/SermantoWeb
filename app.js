@@ -1875,19 +1875,23 @@ function viewOperation(id) {
 
     renderOpExpenses(op.id);
 
+    // Default Tab
+    const tab = 'overview';
+
+    // Switch View
     switchView('operation-details-view');
+
+    // UI State
+    const buttons = document.querySelectorAll('.tabs-nav .tab-btn');
+    buttons.forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+
     if (tab === 'overview') buttons[0].classList.add('active');
-    if (tab === 'personnel') buttons[1].classList.add('active');
-    if (tab === 'expenses') buttons[2].classList.add('active');
 
     document.getElementById(`tab-op-${tab}`).classList.remove('hidden');
 
-    if (tab === 'expenses' && state.activeOperation) {
-        renderOpExpenses(state.activeOperation.id);
-    }
-    if (tab === 'personnel' && state.activeOperation) {
-        loadOpPersonnel(state.activeOperation.id);
-    }
+    renderOpExpenses(op.id);
+    if (state.data.personnel) loadOpPersonnel(op.id);
 }
 
 function renderOpExpenses(opId) {
