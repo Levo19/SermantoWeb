@@ -54,6 +54,10 @@
 
                 <div id="admin-menu-section" class="hidden">
                     <div class="menu-category">Administración</div>
+                    <a class="menu-item" onclick="loadPersonnel(); switchView('personnel-view')">
+                        <i class="ph ph-identification-card"></i>
+                        <span>Personal / RRHH</span>
+                    </a>
                     <a class="menu-item" onclick="loadUsers()">
                         <i class="ph ph-users"></i>
                         <span>Usuarios</span>
@@ -407,6 +411,35 @@
                         </div>
                     </div>
 
+                </div>
+            </section>
+
+            <!-- Personnel View -->
+            <section id="personnel-view" class="hidden fade-in">
+                <header class="top-bar">
+                    <h2>Gestión de Personal</h2>
+                    <button class="btn btn-primary" onclick="openPersonnelModal()">
+                        <i class="ph ph-plus"></i> Nuevo Personal
+                    </button>
+                </header>
+                <div class="content-wrapper">
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Nombre / DNI</th>
+                                    <th>Rol</th>
+                                    <th>Teléfono</th>
+                                    <th>Docs</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="personnel-list">
+                                <!-- JS Populated -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 
