@@ -2144,7 +2144,7 @@ function renderOpPersonnel(links) {
     tbody.innerHTML = fullList.map(item => `
         <tr>
             <td>${item.personnel.Nombres} ${item.personnel.Apellidos}</td>
-            <td>${item.personnel.RolDefault || '-'}</td>
+            <td>${item.link.RolAsignado || item.personnel.RolDefault || '-'}</td>
             <td>${item.link.HoraIngreso || '-'}</td>
             <td>
                 <span class="badge success">Presente</span>
