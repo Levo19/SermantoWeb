@@ -252,6 +252,7 @@ function loginUser(user) {
         loadTools(true);
         loadMermas(true);
         loadOperations(true);
+        if (state.user.role === 'admin' || state.user.role === 'superadmin') loadPersonnel(true);
     }, 60000);
     state.intervals.push(intervalId);
 
@@ -278,8 +279,7 @@ function logout() {
     state.intervals = [];
 
     state.user = null;
-    state.user = null;
-    state.data = { expenses: null, income: null, services: null, tools: null, mermas: null, operations: null }; // Clear Cache
+    state.data = { expenses: null, income: null, services: null, tools: null, mermas: null, operations: null, personnel: null }; // Clear Cache
     localStorage.removeItem('sermanto_user');
     location.reload();
 }
