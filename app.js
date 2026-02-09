@@ -11,15 +11,20 @@ const state = {
         income: null,
         services: null,
         tools: null,
-        mermas: null
+        services: null,
+        tools: null,
+        mermas: null,
+        operations: null
     },
     lastUpdated: {
         expenses: null,
         income: null,
         services: null,
         tools: null,
-        mermas: null
+        mermas: null,
+        operations: null
     },
+    activeOperation: null, // Stores the full object of currently viewed op
     intervals: []
 };
 
@@ -234,7 +239,9 @@ function loginUser(user) {
     loadIncome();
     loadServices();
     loadTools();
+    loadTools();
     loadMermas();
+    loadOperations();
 
     // Start Background Polling (Every 60s)
     const intervalId = setInterval(() => {
@@ -244,6 +251,7 @@ function loginUser(user) {
         loadServices(true);
         loadTools(true);
         loadMermas(true);
+        loadOperations(true);
     }, 60000);
     state.intervals.push(intervalId);
 
@@ -270,7 +278,8 @@ function logout() {
     state.intervals = [];
 
     state.user = null;
-    state.data = { expenses: null, income: null, services: null, tools: null, mermas: null }; // Clear Cache
+    state.user = null;
+    state.data = { expenses: null, income: null, services: null, tools: null, mermas: null, operations: null }; // Clear Cache
     localStorage.removeItem('sermanto_user');
     location.reload();
 }
@@ -771,10 +780,20 @@ function renderExpenses(data) {
             <td><span class="badge">${item.Categoria || 'General'}</span></td>
             <td>S/ ${parseFloat(item.Monto).toFixed(2)}</td>
             <td>
+                <span class="badge ${item.Estado === 'Aprobado' ? 'success' : 'warning'}">
+                    ${item.Estado || 'Aprobado'} 
+                </span>
+            </td>
+            <td>
                     ${item.fileUrl ? `<a href="${item.fileUrl}" target="_blank" class="action-btn"><i class="ph ph-file-pdf"></i> Ver</a>` : '<span class="text-muted">-</span>'}
             </td>
             <td>
+                <div style="display:flex; gap:0.5rem;">
+                ${(item.Estado === 'Pendiente' && ['admin', 'superadmin', 'contador'].includes(state.user.role)) ?
+            `<button class="action-btn text-success" onclick="approveExpense('${item.id}')" title="Aprobar"><i class="ph ph-check"></i></button>` : ''
+        }
                 <button class="action-btn text-danger" onclick="deleteExpense('${item.id}')" title="Eliminar"><i class="ph ph-trash"></i></button>
+                </div>
             </td>
         </tr>
     `).join('');
@@ -788,6 +807,27 @@ function renderExpenses(data) {
     const countEl = document.querySelector('#tab-expenses .mini-stats .value.warning');
     if (countEl) countEl.textContent = data.length;
 }
+
+window.approveExpense = async function (id) {
+    if (!confirm('¿Aprobar este gasto?')) return;
+
+    try {
+        await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'approve',
+                table: 'Gastos',
+                userRole: state.user.role,
+                payload: { id: id }
+            })
+        });
+        showToast('Gasto aprobado', 'success');
+        loadExpenses(); // Reload to update UI
+    } catch (e) {
+        showToast('Error al aprobar', 'error');
+    }
+};
 
 // Global scope for onclick
 window.deleteExpense = async function (id) {
@@ -1732,5 +1772,248 @@ window.resolveMerma = async function (mermaId, action, toolId, totalQty) {
         loadTools();
         loadMermas();
         alert('Error de sincronización.');
+    }
+};
+
+// --- Operations Module Logic ---
+
+async function loadOperations(silent = false) {
+    const container = document.getElementById('operations-list');
+
+    // Cache render
+    if (!silent && state.data.operations) {
+        renderOperations(state.data.operations);
+    } else if (!silent) {
+        container.innerHTML = '<div class="text-center">Cargando operaciones...</div>';
+    }
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'read',
+                table: 'Operaciones',
+                userRole: state.user.role
+            })
+        });
+        const res = await response.json();
+        if (res.status === 'success') {
+            state.data.operations = res.data;
+            renderOperations(res.data);
+
+            // Update Active Count
+            const active = res.data.filter(o => o.Estado !== 'Cerrado').length;
+            const personnel = res.data.reduce((acc, curr) => acc + (parseInt(curr.Personal) || 0), 0);
+
+            if (document.getElementById('op-active-count')) {
+                document.getElementById('op-active-count').textContent = active;
+                document.getElementById('op-personnel-count').textContent = personnel;
+            }
+
+        } else if (!silent) {
+            container.innerHTML = '<div class="text-center">No hay operaciones activas.</div>';
+        }
+    } catch (e) {
+        console.error(e);
+        if (!silent) container.innerHTML = '<div class="text-center warning">Error al cargar.</div>';
+    }
+}
+
+function renderOperations(data) {
+    const container = document.getElementById('operations-list');
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div class="text-center">No hay operaciones.</div>';
+        return;
+    }
+
+    // Sort by Date Desc
+    const sorted = [...data].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    container.innerHTML = sorted.map(op => `
+        <div class="service-card" onclick="viewOperation('${op.id}')" style="cursor:pointer;">
+            <div class="service-header">
+                <div>
+                    <h3>${op.Nombre}</h3>
+                    <small class="text-muted">${op.Codigo || 'Sin Código'}</small>
+                </div>
+                <span class="badge ${op.Estado === 'Cerrado' ? '' : 'warning'}">${op.Estado || 'En Progreso'}</span>
+            </div>
+            <div class="service-body">
+                <p><strong>Tipo:</strong> ${op.Tipo}</p>
+                <div style="display:flex; justify-content:space-between; margin-top:0.5rem;">
+                    <span><i class="ph ph-users"></i> ${op.Personal || 0} pax</span>
+                    <span><i class="ph ph-calendar"></i> ${formatDate(op.timestamp)}</span>
+                </div>
+            </div>
+            <div class="service-footer">
+                <button class="btn btn-sm btn-outline">Ver Panel</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function viewOperation(id) {
+    const op = state.data.operations.find(o => o.id === id);
+    if (!op) return;
+
+    state.activeOperation = op;
+
+    // Fill Details
+    document.getElementById('op-detail-title').textContent = op.Nombre;
+    document.getElementById('op-detail-subtitle').textContent = `Código: ${op.Codigo} | Inicio: ${formatDate(op.timestamp)}`;
+    document.getElementById('op-detail-status').textContent = op.Estado;
+    document.getElementById('op-stage-select').value = op.Etapa || 'Inicio';
+    document.getElementById('op-personnel-input').value = op.Personal || 0;
+
+    // Load Op Expenses (Filter from global expenses or fetch specific?)
+    // Basic approach: Filter global expenses by operationId.
+    // If we haven't loaded expenses yet, we should.
+    if (!state.data.expenses) loadExpenses(true);
+
+    renderOpExpenses(op.id);
+
+    switchView('operation-details-view');
+}
+
+function renderOpExpenses(opId) {
+    const tbody = document.getElementById('op-expenses-list');
+    const expenses = (state.data.expenses || []).filter(e => e.operationId === opId);
+
+    if (expenses.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center">No hay gastos en caja chica para esta operación.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = expenses.map(e => `
+        <tr>
+             <td>${formatDate(e.Fecha)}</td>
+             <td>${e.Categoria} - ${e.Proveedor}</td>
+             <td>S/ ${parseFloat(e.Monto).toFixed(2)}</td>
+             <td><span class="badge ${e.Estado === 'Aprobado' ? 'success' : 'warning'}">${e.Estado || 'Pendiente'}</span></td>
+        </tr>
+    `).join('');
+}
+
+function openOperationModal() {
+    document.getElementById('operation-modal').classList.remove('hidden');
+}
+
+document.getElementById('operation-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button');
+    btn.disabled = true;
+    btn.innerText = "Creando...";
+
+    const formData = new FormData(e.target);
+    const payload = Object.fromEntries(formData.entries());
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'create',
+                table: 'Operaciones',
+                userRole: state.user.role,
+                payload: payload
+            })
+        });
+        const res = await response.json();
+        if (res.status === 'success') {
+            alert('Operación creada: ' + res.generatedCode);
+            closeModal('operation-modal');
+            e.target.reset();
+            loadOperations();
+        } else {
+            alert(res.message);
+        }
+    } catch (err) {
+        console.error(err);
+        alert('Error de conexión');
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Crear Operación";
+    }
+});
+
+function switchOpTab(tab) {
+    document.querySelectorAll('#operation-details-view .tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#operation-details-view .tab-content').forEach(c => c.classList.add('hidden'));
+
+    // Find button (hacky, assumes order or text)
+    // Better to pass 'event' or use ID
+    // Lets just iterate buttons and match onclick text
+    const buttons = document.querySelectorAll('#operation-details-view .tab-btn');
+    if (tab === 'overview') buttons[0].classList.add('active');
+    if (tab === 'expenses') buttons[1].classList.add('active');
+
+    document.getElementById(`tab-op-${tab}`).classList.remove('hidden');
+
+    if (tab === 'expenses' && state.activeOperation) {
+        renderOpExpenses(state.activeOperation.id);
+    }
+}
+
+// Update Op Data
+async function updateOpStage() {
+    if (!state.activeOperation) return;
+    const newVal = document.getElementById('op-stage-select').value;
+    await updateOpField('Etapa', newVal);
+}
+
+async function updateOpPersonnel() {
+    if (!state.activeOperation) return;
+    const newVal = document.getElementById('op-personnel-input').value;
+    await updateOpField('Personal', newVal);
+}
+
+async function updateOpField(field, value) {
+    try {
+        await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'update',
+                table: 'Operaciones',
+                userRole: state.user.role,
+                payload: { id: state.activeOperation.id, [field]: value }
+            })
+        });
+        // Update local state
+        state.activeOperation[field] = value;
+        // Optionally reload list
+        loadOperations(true);
+        alert('Actualizado');
+    } catch (e) {
+        alert('Error al actualizar');
+    }
+}
+
+// Op Expense Logic
+function openOpExpenseModal() {
+    // Reuse existing expense modal but mark it as linked to OP
+    openExpenseModal();
+    // Inject hidden field if it doesn't exist
+    let form = document.getElementById('expense-form');
+    let hidden = form.querySelector('input[name="operationId"]');
+    if (!hidden) {
+        hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'operationId';
+        form.appendChild(hidden);
+    }
+    hidden.value = state.activeOperation.id;
+}
+
+// Helper: Clear opId when opening generic expense modal (from Finances view)
+const _origOpenExpenseModal = openExpenseModal;
+openExpenseModal = function () {
+    _origOpenExpenseModal();
+    // Check if we are in Finances View -> Clear operationId
+    if (state.currentView !== 'operation-details-view') {
+        const form = document.getElementById('expense-form');
+        const hidden = form.querySelector('input[name="operationId"]');
+        if (hidden) hidden.value = '';
     }
 };
