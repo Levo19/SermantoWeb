@@ -1865,8 +1865,17 @@ function viewOperation(id) {
     document.getElementById('op-detail-title').textContent = op.Nombre;
     document.getElementById('op-detail-subtitle').textContent = `Código: ${op.Codigo} | Inicio: ${formatDate(op.timestamp)}`;
     document.getElementById('op-detail-status').textContent = op.Estado;
-    document.getElementById('op-stage-select').value = op.Etapa || 'Inicio';
-    document.getElementById('op-personnel-input').value = op.Personal || 0;
+
+    // Render Stepper
+    renderOpStepper(op.Etapa || 'Inicio');
+
+    // Personnel Count Update
+    // Can calculate from active shifts
+    if (document.getElementById('op-active-personnel-count')) {
+        // This needs async data, ideally we already have it or fetch it.
+        // For now, simple placeholder or fetch
+        // loadOpPersonnel(op.id); // This updates table, maybe simple count too?
+    }
 
     // Load Op Expenses (Filter from global expenses or fetch specific?)
     // Basic approach: Filter global expenses by operationId.
@@ -2128,19 +2137,64 @@ document.getElementById('assign-form').addEventListener('submit', async (e) => {
         alert('Personal agregado a la operación');
         closeModal('assign-modal');
         loadOpPersonnel(state.activeOperation.id);
+        alert('Personal agregado a la operación');
+        closeModal('assign-modal');
+        loadOpPersonnel(state.activeOperation.id);
     } catch (e) {
         alert('Error al asignar');
     }
 });
 
-async function loadOpPersonnel(opId) {
-    const tbody = document.getElementById('op-personnel-list');
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center">Cargando equipo...</td></tr>';
+// Stepper Logic
+function renderOpStepper(currentStage) {
+    const steps = ['Inicio', 'Ejecucion', 'Finalizacion', 'Cerrado'];
+    const currentIndex = steps.indexOf(currentStage);
+
+    document.querySelectorAll('.step-item').forEach((item, index) => {
+        item.classList.remove('active', 'completed');
+        if (index < currentIndex) item.classList.add('completed');
+        if (index === currentIndex) item.classList.add('active');
+    });
+}
+
+window.updateOpStage = async function (newStage) {
+    if (!state.activeOperation) return;
+
+    if (!confirm(`¿Cambiar etapa a ${newStage}?`)) return;
 
     try {
-        // This requires a join or a smart read.
-        // For now, we read all `Operacion_Personal` and filter.
-        // In production, backend should filter.
+        await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'update',
+                table: 'Operaciones',
+                userRole: state.user.role,
+                payload: { id: state.activeOperation.id, Etapa: newStage }
+            })
+        });
+
+        state.activeOperation.Etapa = newStage;
+        renderOpStepper(newStage);
+
+        if (newStage === 'Cerrado') {
+            state.activeOperation.Estado = 'Cerrado';
+            document.getElementById('op-detail-status').textContent = 'Cerrado';
+            // Also update main list
+            loadOperations(true);
+        }
+
+    } catch (e) {
+        console.error(e);
+        alert('Error al actualizar etapa');
+    }
+};
+
+async function loadOpPersonnel(opId) {
+    const tbody = document.getElementById('op-personnel-list');
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center">Cargando turnos...</td></tr>';
+
+    try {
         const response = await fetch(API_URL, {
             method: 'POST',
             body: JSON.stringify({
@@ -2153,9 +2207,16 @@ async function loadOpPersonnel(opId) {
         const res = await response.json();
         if (res.status === 'success') {
             const opTeam = res.data.filter(Link => Link.operationId === opId);
+
+            // Update Active Count
+            const activeCount = opTeam.filter(t => t.Estado === 'Activo').length;
+            if (document.getElementById('op-active-personnel-count')) {
+                document.getElementById('op-active-personnel-count').textContent = activeCount;
+            }
+
             renderOpPersonnel(opTeam);
         } else {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nadie asignado aún.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">Sin registros.</td></tr>';
         }
 
     } catch (e) {
@@ -2166,38 +2227,85 @@ async function loadOpPersonnel(opId) {
 function renderOpPersonnel(links) {
     const tbody = document.getElementById('op-personnel-list');
     if (links.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center">Nadie asignado aún.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">Sin registros.</td></tr>';
         return;
     }
 
-    // Enrich with Personal Data
     const fullList = links.map(link => {
         const p = (state.data.personnel || []).find(x => x.id === link.personalId);
         return { link, personnel: p || { Nombres: 'Desconocido', Apellidos: '' } };
     });
 
-    tbody.innerHTML = fullList.map(item => `
+    tbody.innerHTML = fullList.map(item => {
+        // Calculate Hours if Exit exists
+        let hours = '-';
+        if (item.link.HoraIngreso && item.link.HoraSalida) {
+            // Simple parsing assuming 'HH:MM' 24h format
+            // In a real app, use full Date objects or a library
+            // Here assuming same day or next day handling is handled by manual input or server
+            // For MVP, just display raw or diff if possible. User likely inputs this.
+            hours = item.link.TotalHoras || '?';
+        }
+
+        return `
         <tr>
             <td>
-                ${item.personnel.Nombres} ${item.personnel.Apellidos}
-                <div class="small text-muted">${item.personnel.RolDefault}</div>
+                <strong>${item.personnel.Nombres} ${item.personnel.Apellidos}</strong><br>
+                <small class="text-muted">${item.personnel.RolDefault}</small>
             </td>
             <td>${item.link.RolAsignado || '-'}</td>
             <td>${item.link.HoraIngreso || '-'}</td>
+            <td>${item.link.HoraSalida || '<span class="text-muted">En turno</span>'}</td>
+            <td>${item.link.TotalHoras || '-'}</td>
             <td>
-                <span class="badge ${item.link.Estado === 'Liquidado' ? 'success' : 'warning'}">
+                <span class="badge ${item.link.Estado === 'Liquidado' ? 'success' : (item.link.Estado === 'Activo' ? 'primary' : 'warning')}">
                     ${item.link.Estado || 'Activo'}
                 </span>
             </td>
             <td>
-                ${item.link.Estado !== 'Liquidado' ?
-            `<button class="btn btn-sm btn-outline" onclick="openLiquidationModal('${item.link.id}', '${item.personnel.Nombres} ${item.personnel.Apellidos}', '${item.personnel.PagoDiario}', '${item.personnel.Moneda}')">Liquidar</button>`
-            : `<strong>${item.personnel.Moneda || 'S/'} ${item.link.CostoFinal}</strong>`
-        }
+                ${item.link.Estado === 'Activo' ?
+                `<button class="btn btn-sm btn-outline warning" onclick="registerExit('${item.link.id}')">Marcar Salida</button>`
+                : ''}
+                ${item.link.Estado === 'Terminado' ?
+                `<button class="btn btn-sm btn-outline success" onclick="openLiquidationModal('${item.link.id}', '${item.personnel.Nombres} ${item.personnel.Apellidos}', '${item.personnel.PagoDiario}', '${item.personnel.Moneda}')">Liquidar</button>`
+                : ''}
+                 ${item.link.Estado === 'Liquidado' ?
+                `<strong>${item.personnel.Moneda || 'S/'} ${item.link.CostoFinal}</strong>` : ''}
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 }
+
+window.registerExit = async function (linkId) {
+    const exitTime = prompt("Ingrese Hora Salida (HH:MM):", new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    if (!exitTime) return;
+
+    // Ask for Total Hours (Manual override for accuracy)
+    const totalHours = prompt("Total Horas Trabajadas (Calculado):", "8");
+    if (!totalHours) return;
+
+    try {
+        await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'update',
+                table: 'Operacion_Personal',
+                userRole: state.user.role,
+                payload: {
+                    id: linkId,
+                    HoraSalida: exitTime,
+                    TotalHoras: totalHours,
+                    Estado: 'Terminado' // Ready for Liquidation
+                }
+            })
+        });
+        alert('Salida registrada. Pendiente de liquidación.');
+        loadOpPersonnel(state.activeOperation.id);
+    } catch (e) {
+        alert('Error al registrar salida');
+    }
+};
 
 // Liquidation Logic
 window.openLiquidationModal = function (linkId, name, rate, currency) {
