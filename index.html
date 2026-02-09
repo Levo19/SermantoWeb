@@ -495,7 +495,13 @@
                     <input type="text" name="Contrase&#241;a" class="form-input" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Rol</label>
+                    <label class="form-label">Rol de Sistema (ERP)</label>
+                    <select name="Rol" class="form-input" required>
+                        <option value="operador">Operador / Visualizador</option>
+                        <option value="jefe_operaciones">Jefe de Operaciones</option>
+                        <option value="contador">Contador / Tesorero</option>
+                        <option value="admin">Administrador</option>
+                        <option value="superadmin">Superadmin</option>
                     </select>
                 </div>
                 <button type="submit" class="btn btn-primary">Guardar Usuario</button>
