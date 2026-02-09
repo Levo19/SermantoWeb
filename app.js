@@ -2143,16 +2143,85 @@ function renderOpPersonnel(links) {
 
     tbody.innerHTML = fullList.map(item => `
         <tr>
-            <td>${item.personnel.Nombres} ${item.personnel.Apellidos}</td>
-            <td>${item.link.RolAsignado || item.personnel.RolDefault || '-'}</td>
+            <td>
+                ${item.personnel.Nombres} ${item.personnel.Apellidos}
+                <div class="small text-muted">${item.personnel.RolDefault}</div>
+            </td>
+            <td>${item.link.RolAsignado || '-'}</td>
             <td>${item.link.HoraIngreso || '-'}</td>
             <td>
-                <span class="badge success">Presente</span>
+                <span class="badge ${item.link.Estado === 'Liquidado' ? 'success' : 'warning'}">
+                    ${item.link.Estado || 'Activo'}
+                </span>
             </td>
-            <td>-</td>
+            <td>
+                ${item.link.Estado !== 'Liquidado' ?
+            `<button class="btn btn-sm btn-outline" onclick="openLiquidationModal('${item.link.id}', '${item.personnel.Nombres} ${item.personnel.Apellidos}', '${item.personnel.PagoDiario}', '${item.personnel.Moneda}')">Liquidar</button>`
+            : `<strong>${item.personnel.Moneda || 'S/'} ${item.link.CostoFinal}</strong>`
+        }
+            </td>
         </tr>
     `).join('');
 }
+
+// Liquidation Logic
+window.openLiquidationModal = function (linkId, name, rate, currency) {
+    document.getElementById('liquidation-modal').classList.remove('hidden');
+    document.getElementById('liq-link-id').value = linkId;
+    document.getElementById('liq-name').value = name;
+
+    const dailyRate = parseFloat(rate) || 0;
+    document.getElementById('liq-daily-rate').value = dailyRate;
+    document.getElementById('liq-rate-display').value = `${currency || 'S/'} ${dailyRate}`;
+
+    // Reset defaults
+    document.getElementById('liq-days').value = 1;
+    document.getElementById('liq-bonus').value = 0;
+    document.getElementById('liq-discount').value = 0;
+    calculateLiquidationTotal();
+};
+
+window.calculateLiquidationTotal = function () {
+    const rate = parseFloat(document.getElementById('liq-daily-rate').value) || 0;
+    const days = parseFloat(document.getElementById('liq-days').value) || 0;
+    const bonus = parseFloat(document.getElementById('liq-bonus').value) || 0;
+    const discount = parseFloat(document.getElementById('liq-discount').value) || 0;
+
+    const total = (rate * days) + bonus - discount;
+    document.getElementById('liq-total').value = total.toFixed(2);
+};
+
+document.getElementById('liquidation-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!state.activeOperation) return;
+
+    const formData = new FormData(e.target);
+    const payload = Object.fromEntries(formData.entries());
+
+    // Status update
+    payload.Estado = 'Liquidado';
+    // ID is payload.linkId, we need to map it to 'id' for update
+    payload.id = payload.linkId;
+    delete payload.linkId; // cleanup
+
+    try {
+        await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'db',
+                op: 'update',
+                table: 'Operacion_Personal',
+                userRole: state.user.role,
+                payload: payload
+            })
+        });
+        alert('Personal liquidado correctamente');
+        closeModal('liquidation-modal');
+        loadOpPersonnel(state.activeOperation.id);
+    } catch (e) {
+        alert('Error al liquidar');
+    }
+});
 
 
 document.getElementById('operation-form').addEventListener('submit', async (e) => {
