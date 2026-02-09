@@ -739,10 +739,8 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Tipo de Operación</label>
-                    <select name="Tipo" class="form-input">
-                        <option value="Carga">Carga General</option>
-                        <option value="Descarga">Descarga</option>
-                        <option value="Servicio">Servicio Especial</option>
+                    <select name="Tipo" id="op-service-select" class="form-input">
+                        <!-- Populated via JS -->
                     </select>
                 </div>
                 <div class="form-group">
@@ -852,6 +850,101 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <!-- Personnel Modal -->
+    <div id="personnel-modal" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title">Nuevo Personal</h3>
+                <button class="close-btn" onclick="closeModal('personnel-modal')">&times;</button>
+            </div>
+            <form id="personnel-form">
+                <div class="form-group upload-mini-preview">
+                    <label class="form-label">Certificado / CV (PDF)</label>
+                    <input type="file" id="personnel-file-input" accept="application/pdf" class="form-input">
+                </div>
+                <div class="row" style="display:flex; gap:1rem;">
+                    <div class="form-group" style="flex:1">
+                        <label class="form-label">Nombres</label>
+                        <input type="text" name="Nombres" class="form-input" required>
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <label class="form-label">Apellidos</label>
+                        <input type="text" name="Apellidos" class="form-input" required>
+                    </div>
+                </div>
+                <div class="row" style="display:flex; gap:1rem;">
+                    <div class="form-group" style="flex:1">
+                        <label class="form-label">DNI</label>
+                        <input type="text" name="DNI" class="form-input" required>
+                    </div>
+                    <div class="form-group" style="flex:1">
+                        <label class="form-label">Rol Principal</label>
+                        <select name="RolDefault" class="form-input">
+                            <option value="Operador">Operador</option>
+                            <option value="Supervisor">Supervisor</option>
+                            <option value="Jefe de Riesgos">Jefe de Riesgos</option>
+                            <option value="Administrador">Administrador</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Condiciones Financieras (Pre-Contrato)</label>
+                    <div class="card" style="padding:1rem; border:1px solid #eee;">
+                        <div class="row" style="display:flex; gap:1rem;">
+                            <div style="flex:1">
+                                <label class="small text-muted">Jornal Diario</label>
+                                <input type="number" name="PagoDiario" class="form-input" placeholder="0.00" required>
+                            </div>
+                            <div style="flex:1">
+                                <label class="small text-muted">Moneda</label>
+                                <select name="Moneda" class="form-input">
+                                    <option value="PEN">Soles (S/)</option>
+                                    <option value="USD">Dólares ($)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="margin-top:1rem; display:flex; gap:1rem;">
+                            <label><input type="checkbox" name="IncluyeViaticos"> Incluye Viáticos</label>
+                            <label><input type="checkbox" name="IncluyeTraslado"> Incluye Traslado</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estado</label>
+                    <select name="Estado" class="form-input">
+                        <option value="Apto">Apto para Operación</option>
+                        <option value="No Apto">No Apto / De Baja</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Guardar Personal</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Assign Personnel Modal -->
+    <div id="assign-modal" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title">Convocar Personal</h3>
+                <button class="close-btn" onclick="closeModal('assign-modal')">&times;</button>
+            </div>
+            <form id="assign-form">
+                <div class="form-group">
+                    <label class="form-label">Seleccionar Personal (Apto)</label>
+                    <select id="assign-personnel-select" name="personalId" class="form-input" required>
+                        <!-- JS -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Hora de Ingreso (Convocatoria)</label>
+                    <input type="time" name="HoraIngreso" class="form-input" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Agregar a Operación</button>
+            </form>
         </div>
     </div>
 
