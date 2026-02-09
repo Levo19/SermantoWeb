@@ -41,6 +41,10 @@
                     <i class="ph ph-package"></i>
                     <span>Inventario</span>
                 </a>
+                <a class="menu-item" onclick="switchView('operations-view')">
+                    <i class="ph ph-clipboard-text"></i>
+                    <span>Panel de Operaciones</span>
+                </a>
 
                 <div class="menu-category">Finanzas</div>
                 <a class="menu-item" onclick="switchView('finances-view')">
@@ -133,6 +137,115 @@
                     <div id="services-list" class="services-grid">
                         <!-- JS Populated -->
                     </div>
+                </div>
+            </section>
+
+            <!-- Operations View -->
+            <section id="operations-view" class="hidden fade-in">
+                <header class="top-bar">
+                    <h2>Panel de Operaciones</h2>
+                    <button class="btn btn-primary" onclick="openOperationModal()">
+                        <i class="ph ph-plus"></i> Nueva Operación
+                    </button>
+                </header>
+                <div class="content-wrapper">
+                    <!-- KPI Cards -->
+                    <div class="dashboard-grid mini-stats" style="margin-bottom: 2rem;">
+                        <div class="card stat-card-sm">
+                            <span class="label">Activas</span>
+                            <strong class="value" id="op-active-count">0</strong>
+                        </div>
+                        <div class="card stat-card-sm">
+                            <span class="label">Personal Total</span>
+                            <strong class="value" id="op-personnel-count">0</strong>
+                        </div>
+                    </div>
+
+                    <!-- Operations List -->
+                    <div id="operations-list" class="services-grid">
+                        <!-- JS Populated -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Operation Details View -->
+            <section id="operation-details-view" class="hidden fade-in">
+                <header class="top-bar">
+                    <div style="display:flex; align-items:center; gap:1rem;">
+                        <button class="action-btn" onclick="switchView('operations-view')"><i
+                                class="ph ph-arrow-left"></i></button>
+                        <div>
+                            <h2 id="op-detail-title">Operación #...</h2>
+                            <small class="text-muted" id="op-detail-subtitle">Iniciada el ...</small>
+                        </div>
+                    </div>
+                    <div class="header-actions">
+                        <span class="badge warning" id="op-detail-status">En Progreso</span>
+                    </div>
+                </header>
+
+                <div class="content-wrapper">
+                    <!-- Tabs -->
+                    <div class="tabs-nav">
+                        <button class="tab-btn active" onclick="switchOpTab('overview')">General</button>
+                        <button class="tab-btn" onclick="switchOpTab('expenses')">Caja Chica / Gastos</button>
+                    </div>
+
+                    <!-- Overview Tab -->
+                    <div id="tab-op-overview" class="tab-content active">
+                        <div class="dashboard-grid">
+                            <div class="card">
+                                <h3>Progreso</h3>
+                                <div class="form-group">
+                                    <label class="form-label">Etapa Actual</label>
+                                    <select id="op-stage-select" class="form-input" onchange="updateOpStage()">
+                                        <option value="Inicio">Inicio / Preparación</option>
+                                        <option value="Ejecucion">Ejecución / Carga</option>
+                                        <option value="Finalizacion">Finalización / Desembarque</option>
+                                        <option value="Cerrado">Cerrado</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <h3>Personal</h3>
+                                <div class="form-group">
+                                    <label class="form-label">Personal Activo</label>
+                                    <div style="display:flex; gap:1rem;">
+                                        <input type="number" id="op-personnel-input" class="form-input" value="0">
+                                        <button class="btn btn-sm btn-primary"
+                                            onclick="updateOpPersonnel()">Actualizar</button>
+                                    </div>
+                                    <p class="text-muted small">Acumulado de personal en campo.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Expenses Tab -->
+                    <div id="tab-op-expenses" class="tab-content hidden">
+                        <div class="dashboard-header-actions">
+                            <p class="text-muted">Gastos de Caja Chica para esta operación.</p>
+                            <button class="btn btn-primary" onclick="openOpExpenseModal()">
+                                <i class="ph ph-receipt"></i> Solicitar/Registrar Gasto
+                            </button>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Item</th>
+                                        <th>Monto</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="op-expenses-list">
+                                    <!-- JS Populated -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 </div>
             </section>
 
@@ -249,6 +362,7 @@
                                         <th>Tipo</th>
                                         <th>Categoría</th>
                                         <th>Monto</th>
+                                        <th>Estado</th>
                                         <th>Evidencia</th>
                                         <th>Acciones</th>
                                     </tr>
@@ -574,6 +688,35 @@
                     <input type="date" name="Fecha" class="form-input" required>
                 </div>
                 <button type="submit" class="btn btn-success">Registrar Ingreso</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Operation Modal -->
+    <div id="operation-modal" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title">Nueva Operación</h3>
+                <button class="close-btn" onclick="closeModal('operation-modal')">&times;</button>
+            </div>
+            <form id="operation-form">
+                <div class="form-group">
+                    <label class="form-label">Nombre / Referencia</label>
+                    <input type="text" name="Nombre" class="form-input" placeholder="Ej. Descarga Nave Gloria" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tipo de Operación</label>
+                    <select name="Tipo" class="form-input">
+                        <option value="Carga">Carga General</option>
+                        <option value="Descarga">Descarga</option>
+                        <option value="Servicio">Servicio Especial</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Personal Inicial</label>
+                    <input type="number" name="Personal" class="form-input" value="1" min="1">
+                </div>
+                <button type="submit" class="btn btn-primary">Crear Operación</button>
             </form>
         </div>
     </div>
