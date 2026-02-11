@@ -229,17 +229,41 @@
                                     <p class="text-muted">Personas en turno actual</p>
                                 </div>
                             </div>
+
+                            <div class="card" style="grid-column: span 2;">
+                                <div
+                                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                                    <h3>Equipo Asignado (Cuadrilla)</h3>
+                                    <button class="btn btn-sm btn-outline" onclick="openRosterModal()">
+                                        <i class="ph ph-plus"></i> Gestionar Equipo
+                                    </button>
+                                </div>
+                                <div class="table-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Personal</th>
+                                                <th>Rol Asignado</th>
+                                                <th>Estado Actual</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="op-roster-list">
+                                            <!-- JS Populated -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Personnel Tab -->
+                    <!-- Personnel Tab (Shifts) -->
                     <div id="tab-op-personnel" class="tab-content hidden">
                         <div class="dashboard-header-actions">
                             <div>
-                                <p class="text-muted">Gestión de Turnos y Asistencia (24h)</p>
+                                <p class="text-muted">Registro de Turnos (Entradas y Salidas)</p>
                             </div>
-                            <button class="btn btn-primary btn-sm" onclick="openAssignModal()">
-                                <i class="ph ph-plus"></i> Registrar Ingreso (Turno)
+                            <button class="btn btn-primary btn-sm" onclick="openShiftModal()">
+                                <i class="ph ph-clock"></i> Registrar Ingreso
                             </button>
                         </div>
 
@@ -248,15 +272,15 @@
                                 <thead>
                                     <tr>
                                         <th>Personal</th>
-                                        <th>Rol Turno</th>
-                                        <th>Ingreso</th>
-                                        <th>Salida</th>
-                                        <th>Total Horas</th>
+                                        <th>Inicio</th>
+                                        <th>Fin</th>
+                                        <th>Horas</th>
+                                        <th>Viaticos/Comida</th>
                                         <th>Estado</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
-                                <tbody id="op-personnel-list">
+                                <tbody id="op-shifts-list">
                                     <!-- JS Populated -->
                                 </tbody>
                             </table>
