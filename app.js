@@ -2249,6 +2249,13 @@ function renderRoster(roster, shifts) {
         return;
     }
 
+    // Sort Roster: Supervisor first, then others
+    roster.sort((a, b) => {
+        if (a.RolAsignado === 'Supervisor') return -1;
+        if (b.RolAsignado === 'Supervisor') return 1;
+        return 0;
+    });
+
     tbody.innerHTML = roster.map(item => {
         const p = (state.data.personnel || []).find(x => x.id === item.personalId);
         const name = p ? `${p.Nombres} ${p.Apellidos}` : 'Desconocido';
@@ -2575,7 +2582,7 @@ document.getElementById('operation-form').addEventListener('submit', async (e) =
         if (res.status === 'success') {
             const opId = res.id;
 
-            // 2. Auto-Assign Supervisor
+            // 2. Auto-Assign Supervisor to Roster (Tipo: Asignacion)
             if (supervisorId) {
                 await fetch(API_URL, {
                     method: 'POST',
@@ -2588,8 +2595,8 @@ document.getElementById('operation-form').addEventListener('submit', async (e) =
                             operationId: opId,
                             personalId: supervisorId,
                             RolAsignado: 'Supervisor',
-                            HoraIngreso: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                            Estado: 'Activo'
+                            Tipo: 'Asignacion',
+                            Estado: 'Habilitado'
                         }
                     })
                 });
