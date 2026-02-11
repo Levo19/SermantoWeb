@@ -995,6 +995,47 @@
         </div>
     </div>
 
+    <!-- Shift Start Modal -->
+    <div id="shift-modal" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title">Iniciar Turno</h3>
+                <button class="close-btn" onclick="closeModal('shift-modal')">&times;</button>
+            </div>
+            <form id="shift-form">
+                <div class="form-group">
+                    <label class="form-label">Miembro del Equipo</label>
+                    <select name="RosterId" id="shift-roster-select" class="form-input" required>
+                        <!-- Populated from Roster -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fecha y Hora Ingreso</label>
+                    <input type="datetime-local" name="HoraIngreso" class="form-input" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%">Marcar Ingreso</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Shift Exit Modal -->
+    <div id="exit-modal" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title">Registrar Salida</h3>
+                <button class="close-btn" onclick="closeModal('exit-modal')">&times;</button>
+            </div>
+            <form id="exit-form">
+                <input type="hidden" name="ShiftId" id="exit-shift-id">
+                <div class="form-group">
+                    <label class="form-label">Fecha y Hora Salida</label>
+                    <input type="datetime-local" name="HoraSalida" class="form-input" required>
+                </div>
+                <button type="submit" class="btn btn-success" style="width:100%">Cerrar Turno</button>
+            </form>
+        </div>
+    </div>
+
     <!-- Assign Personnel Modal -->
     <div id="assign-modal" class="modal-overlay hidden">
         <div class="modal-dialog">
