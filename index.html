@@ -1036,6 +1036,35 @@
         </div>
     </div>
 
+    <!-- Roster Modal -->
+    <div id="roster-modal" class="modal-overlay hidden">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 class="modal-title">Gestionar Cuadrilla</h3>
+                <button class="close-btn" onclick="closeModal('roster-modal')">&times;</button>
+            </div>
+            <form id="roster-form">
+                <div class="form-group">
+                    <label class="form-label">Personal Disponible</label>
+                    <select name="PersonalId" id="roster-personnel-select" class="form-input" required>
+                        <!-- JS Populated -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Rol en Operación</label>
+                    <select name="RolAsignado" class="form-input">
+                        <option value="Operador">Operador</option>
+                        <option value="Supervisor">Supervisor</option>
+                        <option value="Tarjador">Tarjador</option>
+                        <option value="Jefe de Riesgos">Jefe de Riesgos</option>
+                        <option value="Estibador">Estibador</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%">Agregar a Cuadrilla</button>
+            </form>
+        </div>
+    </div>
+
     <!-- Assign Personnel Modal -->
     <div id="assign-modal" class="modal-overlay hidden">
         <div class="modal-dialog">
