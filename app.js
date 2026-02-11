@@ -2190,9 +2190,13 @@ window.updateOpStage = async function (newStage) {
     }
 };
 
+// --- Roster & Shift Logic ---
+
+// 1. Load Data (Both Roster and Shifts are in Operacion_Personal)
 async function loadOpPersonnel(opId) {
-    const tbody = document.getElementById('op-personnel-list');
-    tbody.innerHTML = '<tr><td colspan="7" class="text-center">Cargando turnos...</td></tr>';
+    // UI Loading
+    document.getElementById('op-roster-list').innerHTML = '<tr><td colspan="3">Cargando...</td></tr>';
+    document.getElementById('op-shifts-list').innerHTML = '<tr><td colspan="7">Cargando...</td></tr>';
 
     try {
         const response = await fetch(API_URL, {
@@ -2205,18 +2209,31 @@ async function loadOpPersonnel(opId) {
             })
         });
         const res = await response.json();
-        if (res.status === 'success') {
-            const opTeam = res.data.filter(Link => Link.operationId === opId);
 
-            // Update Active Count
-            const activeCount = opTeam.filter(t => t.Estado === 'Activo').length;
+        if (res.status === 'success') {
+            const allRecords = res.data.filter(Link => Link.operationId === opId);
+
+            // Split into Roster (Type 'Asignacion') and Shifts (Type 'Turno' or legacy/undefined)
+            // Note: Legacy records might not have 'Tipo', let's assume if it has 'HoraIngreso' it's a shift.
+            // Or better, we define:
+            // Roster: Tipo === 'Asignacion'
+            // Shift: Tipo === 'Turno'
+
+            const roster = allRecords.filter(r => r.Tipo === 'Asignacion');
+            const shifts = allRecords.filter(r => r.Tipo === 'Turno' || (!r.Tipo && r.HoraIngreso)); // Fallback for legacy
+
+            renderRoster(roster, shifts);
+            renderShifts(shifts);
+
+            // Active Count
+            const activeCount = shifts.filter(s => s.Estado === 'Activo').length;
             if (document.getElementById('op-active-personnel-count')) {
                 document.getElementById('op-active-personnel-count').textContent = activeCount;
             }
 
-            renderOpPersonnel(opTeam);
         } else {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center">Sin registros.</td></tr>';
+            document.getElementById('op-roster-list').innerHTML = '<tr><td colspan="3">Vacio</td></tr>';
+            document.getElementById('op-shifts-list').innerHTML = '<tr><td colspan="7">Vacio</td></tr>';
         }
 
     } catch (e) {
@@ -2224,65 +2241,173 @@ async function loadOpPersonnel(opId) {
     }
 }
 
-function renderOpPersonnel(links) {
-    const tbody = document.getElementById('op-personnel-list');
-    if (links.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center">Sin registros.</td></tr>';
+// 2. Render Roster (General Tab)
+function renderRoster(roster, shifts) {
+    const tbody = document.getElementById('op-roster-list');
+    if (roster.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No hay personal asignado.</td></tr>';
         return;
     }
 
-    const fullList = links.map(link => {
-        const p = (state.data.personnel || []).find(x => x.id === link.personalId);
-        return { link, personnel: p || { Nombres: 'Desconocido', Apellidos: '' } };
-    });
+    tbody.innerHTML = roster.map(item => {
+        const p = (state.data.personnel || []).find(x => x.id === item.personalId);
+        const name = p ? `${p.Nombres} ${p.Apellidos}` : 'Desconocido';
 
-    tbody.innerHTML = fullList.map(item => {
-        // Calculate Hours if Exit exists
-        let hours = '-';
-        if (item.link.HoraIngreso && item.link.HoraSalida) {
-            // Simple parsing assuming 'HH:MM' 24h format
-            // In a real app, use full Date objects or a library
-            // Here assuming same day or next day handling is handled by manual input or server
-            // For MVP, just display raw or diff if possible. User likely inputs this.
-            hours = item.link.TotalHoras || '?';
-        }
+        // Check if currently working (Active Shift)
+        const activeShift = shifts.find(s => s.personalId === item.personalId && s.Estado === 'Activo');
+        const statusIcon = activeShift
+            ? `<span class="badge success"><i class="ph ph-circle" style="font-size:8px; margin-right:4px;"></i> Trabajando</span>`
+            : `<span class="badge" style="background:#f1f5f9; color:#64748b;"><i class="ph ph-circle" style="font-size:8px; margin-right:4px; color:#cbd5e1;"></i> Descanso</span>`;
 
         return `
-        <tr>
-            <td>
-                <strong>${item.personnel.Nombres} ${item.personnel.Apellidos}</strong><br>
-                <small class="text-muted">${item.personnel.RolDefault}</small>
-            </td>
-            <td>${item.link.RolAsignado || '-'}</td>
-            <td>${item.link.HoraIngreso || '-'}</td>
-            <td>${item.link.HoraSalida || '<span class="text-muted">En turno</span>'}</td>
-            <td>${item.link.TotalHoras || '-'}</td>
-            <td>
-                <span class="badge ${item.link.Estado === 'Liquidado' ? 'success' : (item.link.Estado === 'Activo' ? 'primary' : 'warning')}">
-                    ${item.link.Estado || 'Activo'}
-                </span>
-            </td>
-            <td>
-                ${item.link.Estado === 'Activo' ?
-                `<button class="btn btn-sm btn-outline warning" onclick="registerExit('${item.link.id}')">Marcar Salida</button>`
-                : ''}
-                ${item.link.Estado === 'Terminado' ?
-                `<button class="btn btn-sm btn-outline success" onclick="openLiquidationModal('${item.link.id}', '${item.personnel.Nombres} ${item.personnel.Apellidos}', '${item.personnel.PagoDiario}', '${item.personnel.Moneda}')">Liquidar</button>`
-                : ''}
-                 ${item.link.Estado === 'Liquidado' ?
-                `<strong>${item.personnel.Moneda || 'S/'} ${item.link.CostoFinal}</strong>` : ''}
-            </td>
-        </tr>
-    `}).join('');
+            <tr>
+                <td>${name}</td>
+                <td>${item.RolAsignado}</td>
+                <td>${statusIcon}</td>
+            </tr>
+        `;
+    }).join('');
 }
 
+// 3. Render Shifts (Personnel Tab)
+function renderShifts(shifts) {
+    const tbody = document.getElementById('op-shifts-list');
+    if (shifts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No hay turnos registrados.</td></tr>';
+        return;
+    }
+
+    // Sort by latest
+    shifts.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+
+    tbody.innerHTML = shifts.map(item => {
+        const p = (state.data.personnel || []).find(x => x.id === item.personalId);
+        const name = p ? `${p.Nombres} ${p.Apellidos}` : 'Desconocido';
+
+        return `
+            <tr>
+                <td><strong>${name}</strong></td>
+                <td>${item.HoraIngreso || '-'}</td>
+                <td>${item.HoraSalida || '<span class="text-primary">En curso...</span>'}</td>
+                <td>${item.TotalHoras || '-'}</td>
+                <td>
+                    ${item.IncludeFood ? '<i class="ph ph-hamburger" title="Comida"></i>' : ''}
+                    ${item.IncludeTravel ? '<i class="ph ph-bus" title="Viáticos"></i>' : ''}
+                </td>
+                <td><span class="badge ${item.Estado === 'Activo' ? 'primary' : 'success'}">${item.Estado}</span></td>
+                <td>
+                    ${item.Estado === 'Activo' ?
+                `<button class="btn btn-sm btn-outline warning" onclick="registerExit('${item.id}')">Salida</button>`
+                : ''}
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// 4. Modals and Forms
+window.openRosterModal = function () {
+    document.getElementById('roster-modal').classList.remove('hidden');
+    // Populate select
+    const select = document.getElementById('roster-personnel-select');
+    if (!state.data.personnel) {
+        select.innerHTML = '<option>Cargando...</option>';
+        loadPersonnel(true).then(() => openRosterModal()); // Retry
+        return;
+    }
+    // Filter out those already in roster? ideally yes, but simplistic for now
+    select.innerHTML = state.data.personnel.map(p => `<option value="${p.id}">${p.Nombres} ${p.Apellidos} (${p.RolDefault})</option>`).join('');
+}
+
+window.openShiftModal = async function () {
+    document.getElementById('shift-modal').classList.remove('hidden');
+    // Populate select only with ROSTER members
+    const select = document.getElementById('shift-roster-select');
+
+    // We need the roster list again. Hacky: read from state or DOM? 
+    // Let's rely on backend fetch (or cache if we optimized).
+    // Better: Fetch Roster again locally or store in state.activeOperation.roster?
+    // Let's do a quick fetch for correctness.
+    const response = await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+            action: 'db',
+            op: 'read',
+            table: 'Operacion_Personal',
+            userRole: state.user.role
+        })
+    });
+    const res = await response.json();
+    const roster = res.data.filter(r => r.operationId === state.activeOperation.id && r.Tipo === 'Asignacion');
+
+    if (roster.length === 0) {
+        select.innerHTML = '<option value="">No hay equipo asignado. Vaya a General > Gestionar Equipo.</option>';
+    } else {
+        select.innerHTML = roster.map(r => {
+            const p = state.data.personnel.find(x => x.id === r.personalId);
+            return `<option value="${r.personalId}">${p ? p.Nombres + ' ' + p.Apellidos : 'Desconocido'}</option>`;
+        }).join('');
+    }
+
+    // Set default time
+    document.querySelector('input[name="HoraIngreso"]').value = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+// Form Submissions
+document.getElementById('roster-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const payload = Object.fromEntries(formData.entries());
+    payload.operationId = state.activeOperation.id;
+    payload.Tipo = 'Asignacion';
+    payload.Estado = 'Habilitado';
+
+    try {
+        await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'db', op: 'create', table: 'Operacion_Personal', userRole: state.user.role, payload })
+        });
+        alert('Agregado a la cuadrilla');
+        closeModal('roster-modal');
+        loadOpPersonnel(state.activeOperation.id);
+    } catch (e) { alert('Error'); }
+});
+
+document.getElementById('shift-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const payload = Object.fromEntries(formData.entries());
+
+    // Payload has RosterId (which is personalId in our select value)
+    payload.personalId = payload.RosterId;
+    delete payload.RosterId;
+
+    payload.operationId = state.activeOperation.id;
+    payload.Tipo = 'Turno';
+    payload.Estado = 'Activo';
+    // HoraIngreso is from form
+
+    try {
+        await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'db', op: 'create', table: 'Operacion_Personal', userRole: state.user.role, payload })
+        });
+        alert('Turno iniciado');
+        closeModal('shift-modal');
+        loadOpPersonnel(state.activeOperation.id);
+    } catch (e) { alert('Error'); }
+});
+
 window.registerExit = async function (linkId) {
-    const exitTime = prompt("Ingrese Hora Salida (HH:MM):", new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    // Advanced Exit with Questions
+    const exitTime = prompt("Hora de Salida (HH:MM)", new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }));
     if (!exitTime) return;
 
-    // Ask for Total Hours (Manual override for accuracy)
-    const totalHours = prompt("Total Horas Trabajadas (Calculado):", "8");
-    if (!totalHours) return;
+    const hours = prompt("Horas Trabajadas (ej. 8, 12)", "8");
+    if (!hours) return;
+
+    const food = confirm("¿Incluir Comida?");
+    const travel = confirm("¿Incluir Viáticos/Pasajes?");
 
     try {
         await fetch(API_URL, {
@@ -2295,17 +2420,17 @@ window.registerExit = async function (linkId) {
                 payload: {
                     id: linkId,
                     HoraSalida: exitTime,
-                    TotalHoras: totalHours,
-                    Estado: 'Terminado' // Ready for Liquidation
+                    TotalHoras: hours,
+                    IncludeFood: food,
+                    IncludeTravel: travel,
+                    Estado: 'Terminado'
                 }
             })
         });
-        alert('Salida registrada. Pendiente de liquidación.');
+        alert('Salida registrada');
         loadOpPersonnel(state.activeOperation.id);
-    } catch (e) {
-        alert('Error al registrar salida');
-    }
-};
+    } catch (e) { alert('Error'); }
+}
 
 // Liquidation Logic
 window.openLiquidationModal = function (linkId, name, rate, currency) {
